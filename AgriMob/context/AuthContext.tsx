@@ -53,33 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (userStr) {
         const userData = JSON.parse(userStr);
         setUser(userData);
-      } else {
-        // Static buyer user for testing
-        const staticUser: AuthUser = {
-          id: 1,
-          email: "buyer@example.com",
-          username: "buyer",
-          phone: "1234567890",
-          role: "BUYER",
-          is_verified: true,
-          is_active: true,
-          created_at: new Date().toISOString(),
-        };
-        setUser(staticUser);
       }
+      // Don't set static user - let user choose role
     } catch (error) {
-      // Set static user on error too
-      const staticUser: AuthUser = {
-        id: 1,
-        email: "buyer@example.com",
-        username: "buyer",
-        phone: "1234567890",
-        role: "BUYER",
-        is_verified: true,
-        is_active: true,
-        created_at: new Date().toISOString(),
-      };
-      setUser(staticUser);
+      // Don't set static user on error
     } finally {
       setIsLoading(false);
     }

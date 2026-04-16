@@ -16,6 +16,12 @@ export interface MyProductFarm {
   farmer:     number;
 }
 
+interface MinistryProduct {
+  id:             number;
+  name:           string;
+  slug:           string;
+  description:    string;
+  category:       string;}
 export interface MyProduct {
   id:             number;
   title:          string;
@@ -23,10 +29,11 @@ export interface MyProduct {
   farmer_name:    string;
   description:    string;
   season:         string;
-  unit_price:     string;   // decimal string
+  unit_price:     string;   
   stock:          number;
   in_stock:       boolean;
-  category:       string;   // slug string, e.g. "vegetables"
+  category_name:  string;
+  ministry_product: MinistryProduct;
   images:         MyProductImage[];
   average_rating: number;
   review_count:   number;

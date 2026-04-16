@@ -46,13 +46,13 @@ export type TrendPeriod = "Last 30 Days" | "Last Quarter";
 
 
 export const adminNavItems: AdminNavItem[] = [
-  { icon: "dashboard", label: "Dashboard", href: "#", active: true },
-  { icon: "map", label: "Regional Data", href: "#" },
-  { icon: "trending_up", label: "Commodity Prices", href: "#" },
-  { icon: "people_alt", label: "Farmer Registry", href: "#" },
-  { icon: "local_shipping", label: "Logistics", href: "#" },
-  { icon: "gavel", label: "Regulations", href: "#", section: "System" },
-  { icon: "settings", label: "Settings", href: "#" },
+  { icon: "dashboard", label: "Dashboard", href: "/Ministry/dashboard", active: true },
+  { icon: "map", label: "Regional Data", href: "/Ministry/dashboard/RegionalData" },
+  { icon: "trending_up", label: "Official Prices", href: "/Ministry/dashboard/PricesManagement" },
+  {icon: "category", label: "Categories", href: "/Ministry/dashboard/categories" },
+  { icon: "people_alt", label: "Users Management", href: "/Ministry/dashboard/users" },
+  
+  {icon: "bar_chart", label: "Analytics", href: "/Ministry/dashboard/analytics" },
 ];
 
 export const recentTransactions: Transaction[] = [

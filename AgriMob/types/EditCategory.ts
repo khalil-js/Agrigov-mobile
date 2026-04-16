@@ -1,24 +1,41 @@
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Form ─────────────────────────────────────────────────────────────────────
 
 export interface CategoryForm {
   name:        string;
+  slug:        string;
   description: string;
 }
+
+/** Auto-generate a URL-safe slug from a display name */
+export function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-');
+}
+
+// ─── Quality metric (UI-only) ─────────────────────────────────────────────────
 
 export interface QualityMetric {
   id:         string;
   name:       string;
-  limit:      string;        // display label e.g. "Max Allowed: 14.0%"
-  value:      string;        // display value e.g. "14.0%"
-  barPercent: number;        // 0–100
-  barClass:   string;        // Tailwind colour class for the bar
-  valueClass: string;        // Tailwind colour class for the value label
+  limit:      string;
+  value:      string;
+  barPercent: number;
+  barClass:   string;
+  valueClass: string;
 }
+
+// ─── Certification chip (UI-only) ─────────────────────────────────────────────
 
 export interface Certification {
   id:    string;
   label: string;
 }
+
+// ─── Sub-category (UI-only — no dedicated API yet) ────────────────────────────
 
 export interface SubCategory {
   id:           string;
@@ -28,6 +45,8 @@ export interface SubCategory {
   variantCount: number;
 }
 
+// ─── Nav ──────────────────────────────────────────────────────────────────────
+
 export interface NavItem {
   label:   string;
   icon:    string;
@@ -36,42 +55,19 @@ export interface NavItem {
   filled?: boolean;
 }
 
-export interface MobileNavItem {
-  label:   string;
-  icon:    string;
-  active?: boolean;
-}
-
-// ─── Data ─────────────────────────────────────────────────────────────────────
+// ─── Static fallback data ─────────────────────────────────────────────────────
 
 export const SIDEBAR_NAV: NavItem[] = [
-  { label: 'Dashboard', icon: 'dashboard',   href: '/admin' },
+  { label: 'Dashboard', icon: 'dashboard',    href: '/admin'               },
   { label: 'Fields',    icon: 'potted_plant', href: '/regional', active: true, filled: true },
-  { label: 'Crops',     icon: 'agriculture',  href: '/inventory' },
-  { label: 'Inventory', icon: 'inventory_2',  href: '/inventory/new' },
-  { label: 'Reports',   icon: 'analytics',    href: '/admin/reports' },
+  { label: 'Crops',     icon: 'agriculture',  href: '/inventory'           },
+  { label: 'Inventory', icon: 'inventory_2',  href: '/inventory/new'       },
+  { label: 'Reports',   icon: 'analytics',    href: '/admin/reports'       },
 ];
 
-export const TOP_NAV: NavItem[] = [
-  { label: 'Dashboard', icon: '', href: '/admin',     active: true },
-  { label: 'Inventory', icon: '', href: '/inventory' },
-  { label: 'Reports',   icon: '', href: '/admin/reports' },
-];
+export const BREADCRUMBS = ['Catalog', 'Categories', 'Edit Category'] as const;
 
-export const MOBILE_NAV: MobileNavItem[] = [
-  { label: 'Dashboard', icon: 'dashboard', active: true },
-  { label: 'Crops',     icon: 'agriculture' },
-  { label: 'Inventory', icon: 'inventory_2' },
-  { label: 'Profile',   icon: 'person' },
-];
-
-export const BREADCRUMBS = ['Catalog', 'Categories', 'Edit Grains'] as const;
-
-export const INITIAL_FORM: CategoryForm = {
-  name:        'Grains',
-  description:
-    'Includes all cereal crops grown for the edible components of their grain. This category covers primary sustenance crops requiring strict moisture control and pest management during storage and distribution.',
-};
+export const EMPTY_FORM: CategoryForm = { name: '', slug: '', description: '' };
 
 export const INITIAL_METRICS: QualityMetric[] = [
   {
@@ -113,13 +109,6 @@ export const INITIAL_SUBCATEGORIES: SubCategory[] = [
     imageUrl:     'https://lh3.googleusercontent.com/aida-public/AB6AXuDU-Ze7DWWNZA5t6k97mx6WqWxX89wqpmr1_cXtQ9L2cy8A2E0F54_N2w7f7DEl-7O9VZegeSZRYnjuUqsJiEzpeKKsJljfCiyX2Ue45R5rsMszoZxpzuaWePS6a_jeqDojeoMlsCXreuEqrXqOG5RkO-pzLeNzfo-2kwbGgFvyVHefgmTr1PBD3Nm7cMCFuPhHKDf-Se-rwiE2zLLgkqi8lU_0vYEAo2rLAGASZ-wexeYMSM1JW5u2tt164e6nQw27V3xvbVfvJKk',
     imageAlt:     'Wooden scoop filled with raw golden wheat grains',
     variantCount: 89,
-  },
-  {
-    id:           'rice',
-    name:         'Rice',
-    imageUrl:     'https://lh3.googleusercontent.com/aida-public/AB6AXuBjMPh8md4RuWxbT5sibwW9pMFMCHvXmwZbFGJn_vsECO-5uK3cGAYcMyamMPBmIMeN9vNvswrmHK_NsBCE4GjfQ8YJWt27zfUmEO3RZg7spsTU8Gm8hKcla01T0Rlylg3mh3wcjRg1n1YEWsaL_0odX0GgSKRTC1X8vLkR1ggAqV8O_Jb6VPcdEHdL5HqfgbH1EPHVxld7_MpntAenv0scuc9TeSVFJ4B873Juh3LRofToFFSq2W-Fc9qgb8ZeZCJ7PLsrdsc16l8',
-    imageAlt:     'Long-grain white basmati rice on a dark slate surface',
-    variantCount: 210,
   },
 ];
 

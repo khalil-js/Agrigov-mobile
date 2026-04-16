@@ -9,7 +9,7 @@ import {
   TextInput,
   ScrollView,
 } from "react-native";
-import { Order } from "../types";
+import { Order } from "../../types/types";
 
 const OrdersScreen = () => {
   const [orders] = useState<Order[]>([
@@ -41,7 +41,7 @@ const OrdersScreen = () => {
   const filtered = orders.filter(
     (o) =>
       o.order_id.toLowerCase().includes(search.toLowerCase()) ||
-      o.product.toLowerCase().includes(search.toLowerCase())
+      o.product.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -103,11 +103,7 @@ const OrdersScreen = () => {
 
           <View style={styles.divider} />
 
-          <Row
-            label="Total"
-            value={`$${selectedOrder.amount}`}
-            bold
-          />
+          <Row label="Total" value={`$${selectedOrder.amount}`} bold />
 
           <TouchableOpacity style={styles.button}>
             <Text style={styles.buttonText}>Download Invoice</Text>

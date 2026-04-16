@@ -15,7 +15,13 @@ export interface CartFarm {
 /** Product shape as embedded inside a cart item */
 export interface CartProduct {
   id:             number;
-  title:          string;
+  ministry_product :{
+    id: number;
+    name: string;
+    slug: string;
+    category: string;
+    isActive: boolean;
+  };
   farm:           CartFarm;
   farmer_name:    string;
   description:    string;

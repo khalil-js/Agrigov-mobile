@@ -1,116 +1,61 @@
-// ─── Status ──────────────────────────────────────────────────────────────────
+// ─── API shapes ───────────────────────────────────────────────────────────────
 
-export type CategoryStatus = 'Active' | 'Inactive';
-
-// ─── Category ────────────────────────────────────────────────────────────────
-
-export interface Category {
-  id: string;
+export interface ApiCategory {
+  id:   number;
   name: string;
-  icon: string; // Material Symbol name
-  subCategoryCount: number;
-  status: CategoryStatus;
-  qualityScore: number; // 0–100
+  slug: string;
 }
 
-// ─── Quality Standard ────────────────────────────────────────────────────────
+export interface CategoriesApiResponse {
+  count:    number;
+  next:     string | null;
+  previous: string | null;
+  results:  ApiCategory[];
+}
+
+// ─── Create / Update payload ──────────────────────────────────────────────────
+
+export interface CategoryPayload {
+  name:         string;
+  slug:         string;
+  description?: string;
+}
+
+// ─── Nav ──────────────────────────────────────────────────────────────────────
+
+export interface NavItem {
+  label:   string;
+  icon:    string;
+  href:    string;
+  active?: boolean;
+}
+
+export const NAV_ITEMS: NavItem[] = [
+  { label: 'Dashboard',          icon: 'dashboard',  href: '/admin'        },
+  { label: 'User Management',    icon: 'group',       href: '/admin/users'  },
+  { label: 'Price Regulation',   icon: 'payments',    href: '/prices'       },
+  { label: 'Product Categories', icon: 'category',    href: '/admin/categories', active: true },
+];
+
+// ─── Static UI-only types (quality standards & certifications panels) ─────────
+// These remain local-state only until dedicated API endpoints are added.
 
 export type StandardStatus = 'met' | 'pending';
 
 export interface QualityStandard {
-  id: string;
-  name: string;
+  id:          string;
+  name:        string;
   description: string;
-  status: StandardStatus;
+  status:      StandardStatus;
 }
-
-// ─── Certification ───────────────────────────────────────────────────────────
 
 export interface Certification {
-  id: string;
-  name: string;
+  id:          string;
+  name:        string;
   description: string;
-  icon: string; // Material Symbol name
-  appliesTo: string[]; // category labels or ['All']
+  icon:        string;
+  appliesTo:   string[];
 }
-
-// ─── Nav Item ────────────────────────────────────────────────────────────────
-
-export interface NavItem {
-  label: string;
-  icon: string;
-  href: string;
-  active?: boolean;
-}
-
-
-
-
-
-
-export const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',         icon: 'dashboard',   href: '/admin' },
-  { label: 'User Management',   icon: 'group',        href: '/admin/users' },
-  { label: 'Price Regulation',  icon: 'payments',     href: '/prices' },
-  { label: 'Product Categories',icon: 'category',     href: '/categories', active: true },
-];
-
-// ─── Categories ──────────────────────────────────────────────────────────────
-
-export const INITIAL_CATEGORIES: Category[] = [
-  {
-    id:               'grains',
-    name:             'Grains',
-    icon:             'grass',
-    subCategoryCount: 12,
-    status:           'Active',
-    qualityScore:     85,
-  },
-  {
-    id:               'vegetables',
-    name:             'Vegetables',
-    icon:             'eco',
-    subCategoryCount: 24,
-    status:           'Active',
-    qualityScore:     92,
-  },
-  {
-    id:               'fruits',
-    name:             'Fruits',
-    icon:             'nutrition',
-    subCategoryCount: 18,
-    status:           'Active',
-    qualityScore:     78,
-  },
-  {
-    id:               'tubers',
-    name:             'Tubers',
-    icon:             'potted_plant',
-    subCategoryCount: 8,
-    status:           'Inactive',
-    qualityScore:     45,
-  },
-];
-
-// ─── Status badge lookup ──────────────────────────────────────────────────────
-
-export const STATUS_BADGE_STYLES: Record<
-  Category['status'],
-  { badge: string; icon: string; bar: string }
-> = {
-  Active: {
-    badge: 'bg-primary/20 text-primary border border-primary/30',
-    icon:  'text-primary',
-    bar:   'bg-primary',
-  },
-  Inactive: {
-    badge: 'bg-slate-200 text-slate-500 dark:bg-slate-800 border border-slate-300 dark:border-slate-700',
-    icon:  'text-slate-400',
-    bar:   'bg-slate-300 dark:bg-slate-600',
-  },
-};
-
-// ─── Quality Standards ────────────────────────────────────────────────────────
 
 export const INITIAL_QUALITY_STANDARDS: QualityStandard[] = [
   {
@@ -132,8 +77,6 @@ export const INITIAL_QUALITY_STANDARDS: QualityStandard[] = [
     status:      'pending',
   },
 ];
-
-// ─── Certifications ───────────────────────────────────────────────────────────
 
 export const CERTIFICATIONS: Certification[] = [
   {

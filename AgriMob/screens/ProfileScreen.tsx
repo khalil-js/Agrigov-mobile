@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
+import { useAuth } from "../context/AuthContext";
 
 interface User {
   name: string;
@@ -19,20 +20,12 @@ interface User {
   activeDeliveries: number;
 }
 
-const mockUser: User = {
-  name: "Green Valley Co-op",
-  role: "Verified Buyer",
-  totalOrders: 24,
-  activeDeliveries: 2,
-};
-
 const ProfileScreen = () => {
-  const user = mockUser;
+  const { user, logout } = useAuth();
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-
         {/* HEADER */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -50,26 +43,24 @@ const ProfileScreen = () => {
 
         {/* PROFILE */}
         <View style={styles.profileSection}>
-          <Text style={styles.name}>{user.name}</Text>
+          <Text style={styles.name}>{user?.username || user?.email}</Text>
 
           <View style={styles.verifiedRow}>
             <MaterialIcons name="verified" size={16} color="#0df20d" />
-            <Text style={styles.verifiedText}>{user.role}</Text>
+            <Text style={styles.verifiedText}>{user?.role}</Text>
           </View>
 
           {/* STATS */}
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <MaterialIcons name="shopping-bag" size={22} color="#0df20d" />
-              <Text style={styles.statNumber}>{user.totalOrders}</Text>
+              <Text style={styles.statNumber}>12</Text>
               <Text style={styles.statLabel}>Total Orders</Text>
             </View>
 
             <View style={[styles.statCard, styles.activeCard]}>
               <MaterialIcons name="local-shipping" size={22} color="#fff" />
-              <Text style={[styles.statNumber, { color: "#fff" }]}>
-                {user.activeDeliveries}
-              </Text>
+              <Text style={[styles.statNumber, { color: "#fff" }]}>2</Text>
               <Text style={[styles.statLabel, { color: "#fff" }]}>
                 Active Deliveries
               </Text>
@@ -104,19 +95,16 @@ const ProfileScreen = () => {
         </View>
 
         {/* LOGOUT */}
-        <TouchableOpacity style={styles.logoutBtn}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
           <MaterialIcons name="logout" size={20} color="#b91c1c" />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
-
-      
     </SafeAreaView>
   );
 };
 
 export default ProfileScreen;
-
 
 // ================= COMPONENTS =================
 
@@ -132,17 +120,12 @@ const SettingItem = ({ icon, label }: any) => (
 
 const NavItem = ({ icon, label, active }: any) => (
   <TouchableOpacity style={styles.navItem}>
-    <MaterialIcons
-      name={icon}
-      size={24}
-      color={active ? "#0df20d" : "#777"}
-    />
+    <MaterialIcons name={icon} size={24} color={active ? "#0df20d" : "#777"} />
     <Text style={[styles.navLabel, active && { color: "#0df20d" }]}>
       {label}
     </Text>
   </TouchableOpacity>
 );
-
 
 // ================= STYLES =================
 
@@ -320,7 +303,6 @@ const styles = StyleSheet.create({
     color: "#777",
   },
 });
-
 
 /*import { useEffect, useState } from "react";
 import axios from "axios";

@@ -10,7 +10,7 @@ import {
   Image,
 } from "react-native";
 
-import { Product, Transporter } from "../types";
+import { Product, Transporter } from "../../types/types";
 
 const CheckoutScreen = () => {
   // 🟢 Mock data (replace with API from Django)
@@ -43,8 +43,9 @@ const CheckoutScreen = () => {
     },
   ]);
 
-  const [selectedTransporter, setSelectedTransporter] =
-    useState<Transporter>(transporters[0]);
+  const [selectedTransporter, setSelectedTransporter] = useState<Transporter>(
+    transporters[0],
+  );
 
   const [card, setCard] = useState({
     number: "",
@@ -56,7 +57,7 @@ const CheckoutScreen = () => {
   // 🧮 Calculations
   const subtotal = products.reduce(
     (acc, item) => acc + item.price * item.quantity,
-    0
+    0,
   );
 
   const total = subtotal + selectedTransporter.price;
@@ -152,10 +153,7 @@ const CheckoutScreen = () => {
         <View style={styles.divider} />
 
         <Row label="Subtotal" value={`$${subtotal}`} />
-        <Row
-          label="Transport"
-          value={`$${selectedTransporter.price}`}
-        />
+        <Row label="Transport" value={`$${selectedTransporter.price}`} />
 
         <Row label="Total" value={`$${total}`} bold />
 
