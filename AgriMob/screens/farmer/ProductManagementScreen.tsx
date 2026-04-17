@@ -38,7 +38,7 @@ const products: Product[] = [
   },
   {
     id: "2",
-    name: "Honey Bantam Corn",
+    name: "Honey Corn",
     type: "Grain",
     variety: "Extra Sweet",
     quantity: "1200 units",
@@ -61,56 +61,75 @@ const products: Product[] = [
 ];
 
 export default function ProductManagementScreen() {
-  const renderStatus = (status: ProductStatus) => {
-    let color = "#999";
+  const getStatusStyle = (status: ProductStatus) => {
+    switch (status) {
+      case "Active":
+        return { backgroundColor: "#0df20d20", color: "#0df20d" };
+      case "Out of Stock":
+        return { backgroundColor: "#99999920", color: "#777" };
+      case "Draft":
+        return { backgroundColor: "#ff950020", color: "#ff9500" };
+    }
+  };
 
-    if (status === "Active") color = "green";
-    if (status === "Out of Stock") color = "gray";
-    if (status === "Draft") color = "orange";
+  const renderItem = ({ item }: { item: Product }) => {
+    const statusStyle = getStatusStyle(item.status);
 
     return (
-      <Text style={[styles.status, { color }]}>{status}</Text>
+      <View style={styles.card}>
+
+        {/* IMAGE */}
+        <Image source={{ uri: item.image }} style={styles.image} />
+
+        {/* INFO */}
+        <View style={styles.info}>
+          <Text style={styles.title}>{item.name}</Text>
+
+          <Text style={styles.subText}>
+            {item.type} • {item.variety}
+          </Text>
+
+          <Text style={styles.meta}>Qty: {item.quantity}</Text>
+          <Text style={styles.meta}>
+            Price: {item.price} • Market {item.marketPrice}
+          </Text>
+
+          {/* STATUS BADGE */}
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: statusStyle.backgroundColor },
+            ]}
+          >
+            <Text style={{ color: statusStyle.color, fontWeight: "700", fontSize: 11 }}>
+              {item.status}
+            </Text>
+          </View>
+        </View>
+
+        {/* ACTIONS */}
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.iconBtn}>
+            <MaterialIcons name="edit" size={18} color="#0df20d" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.iconBtn}>
+            <MaterialIcons name="visibility-off" size={18} color="#777" />
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   };
 
-  const renderItem = ({ item }: { item: Product }) => (
-    <View style={styles.card}>
-      <Image source={{ uri: item.image }} style={styles.image} />
-
-      <View style={styles.info}>
-        <Text style={styles.title}>{item.name}</Text>
-        <Text style={styles.subText}>
-          {item.type} • {item.variety}
-        </Text>
-
-        <Text style={styles.meta}>Qty: {item.quantity}</Text>
-        <Text style={styles.meta}>
-          Price: {item.price} (Market {item.marketPrice})
-        </Text>
-
-        {renderStatus(item.status)}
-      </View>
-
-      <View style={styles.actions}>
-        <TouchableOpacity>
-          <MaterialIcons name="edit" size={22} color="#0df20d" />
-        </TouchableOpacity>
-
-        <TouchableOpacity>
-          <MaterialIcons name="visibility-off" size={22} color="#999" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
   return (
     <View style={styles.container}>
+
       {/* HEADER */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Product Management</Text>
 
         <TouchableOpacity style={styles.addButton}>
-          <MaterialIcons name="add-circle" size={20} color="#000" />
+          <MaterialIcons name="add-circle" size={18} color="#000" />
           <Text style={styles.addText}>Add Listing</Text>
         </TouchableOpacity>
       </View>
@@ -118,8 +137,8 @@ export default function ProductManagementScreen() {
       {/* FILTERS */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={styles.filters}>
-          {["All", "Active", "Out of Stock", "Drafts"].map((f) => (
-            <TouchableOpacity key={f} style={styles.filterBtn}>
+          {["All", "Active", "Out of Stock", "Draft"].map((f) => (
+            <TouchableOpacity key={f} style={styles.filterChip}>
               <Text style={styles.filterText}>{f}</Text>
             </TouchableOpacity>
           ))}
@@ -136,7 +155,6 @@ export default function ProductManagementScreen() {
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -144,15 +162,16 @@ const styles = StyleSheet.create({
     padding: 16,
   },
 
+  /* HEADER */
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 14,
   },
 
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
     color: "#111",
   },
@@ -164,7 +183,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#0df20d",
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: 10,
   },
 
   addText: {
@@ -172,13 +191,14 @@ const styles = StyleSheet.create({
     color: "#000",
   },
 
+  /* FILTERS */
   filters: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 12,
   },
 
-  filterBtn: {
+  filterChip: {
     backgroundColor: "#fff",
     paddingVertical: 6,
     paddingHorizontal: 14,
@@ -192,18 +212,23 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
+  /* CARD */
   card: {
     flexDirection: "row",
     backgroundColor: "#fff",
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 12,
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
 
   image: {
-    width: 60,
-    height: 60,
+    width: 55,
+    height: 55,
     borderRadius: 10,
     marginRight: 12,
   },
@@ -213,8 +238,8 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "800",
   },
 
   subText: {
@@ -228,15 +253,24 @@ const styles = StyleSheet.create({
     color: "#444",
   },
 
-  status: {
+  statusBadge: {
+    alignSelf: "flex-start",
     marginTop: 6,
-    fontWeight: "700",
-    fontSize: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
   },
 
+  /* ACTIONS */
   actions: {
-    flexDirection: "column",
+    justifyContent: "center",
     gap: 10,
     marginLeft: 10,
+  },
+
+  iconBtn: {
+    padding: 6,
+    backgroundColor: "#f3f3f3",
+    borderRadius: 8,
   },
 });

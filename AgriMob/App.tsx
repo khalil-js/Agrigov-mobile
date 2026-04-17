@@ -1,11 +1,13 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
+
 import { AuthProvider, useAuth } from "./context/AuthContext";
+
 import AuthNavigator from "./navigation/AuthNavigator";
 import AppNavigator from "./navigation/AppNavigator";
-import BuyerTabNavigator from "./navigation/BuyerTabNavigator";
+import MissionManagementScreen from "./screens/transporter/MissionManagementScreen";
+
 function RootNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -27,7 +29,7 @@ function RootNavigator() {
 export default function App() {
   return (
     <AuthProvider>
-      <RootNavigator />
+      <MissionManagementScreen />
     </AuthProvider>
   );
 }
