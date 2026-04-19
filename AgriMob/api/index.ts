@@ -1,2 +1,2 @@
 export { api } from "./client";
-export { authApi } from "./auth";
+export { authApi } from "../apis/auth";

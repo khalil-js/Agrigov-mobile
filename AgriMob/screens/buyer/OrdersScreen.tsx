@@ -1,4 +1,3 @@
-// OrdersScreen.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -10,6 +9,11 @@ import {
   ScrollView,
 } from "react-native";
 import { Order } from "../../types/types";
+
+/* 🇩🇿 Algerian Currency Formatter */
+const formatDZD = (value: number) => {
+  return value.toFixed(2) + " DZD";
+};
 
 const OrdersScreen = () => {
   const [orders] = useState<Order[]>([
@@ -41,12 +45,37 @@ const OrdersScreen = () => {
   const filtered = orders.filter(
     (o) =>
       o.order_id.toLowerCase().includes(search.toLowerCase()) ||
-      o.product.toLowerCase().includes(search.toLowerCase()),
+      o.product.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const renderItem = ({ item }: { item: Order }) => (
+    <TouchableOpacity
+      style={[
+        styles.orderCard,
+        selectedOrder?.id === item.id && styles.selected,
+      ]}
+      onPress={() => setSelectedOrder(item)}
+    >
+      <View style={styles.orderLeft}>
+        <Text style={styles.orderId}>#{item.order_id}</Text>
+
+        <Text style={styles.product}>{item.product}</Text>
+
+        <Text style={styles.text}>Supplier: {item.supplier}</Text>
+
+        <Text style={styles.date}>{item.date}</Text>
+      </View>
+
+      <View style={styles.orderRight}>
+        <Text style={styles.price}>{formatDZD(item.amount)}</Text>
+        <StatusBadge status={item.status} />
+      </View>
+    </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      {/* 🔍 Search */}
+      {/* Search */}
       <TextInput
         placeholder="Search orders..."
         style={styles.search}
@@ -54,41 +83,28 @@ const OrdersScreen = () => {
         onChangeText={setSearch}
       />
 
-      {/* 📋 Orders List */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id.toString()}
-        style={{ flex: 1 }}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.orderCard,
-              selectedOrder?.id === item.id && styles.selected,
-            ]}
-            onPress={() => setSelectedOrder(item)}
-          >
-            <View>
-              <Text style={styles.orderId}>#{item.order_id}</Text>
-              <Text style={styles.text}>{item.supplier}</Text>
-              <Text style={styles.text}>
-                {item.product} • {item.quantity}
-              </Text>
-            </View>
+      {/* Orders List */}
+      {filtered.length === 0 ? (
+        <View style={styles.empty}>
+          <Text>No orders found</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderItem}
+          style={{ flex: 1 }}
+        />
+      )}
 
-            <View style={{ alignItems: "flex-end" }}>
-              <Text style={styles.price}>${item.amount}</Text>
-              <StatusBadge status={item.status} />
-            </View>
-          </TouchableOpacity>
-        )}
-      />
-
-      {/* 📄 Invoice Panel */}
+      {/* Invoice Panel */}
       {selectedOrder && (
         <ScrollView style={styles.invoice}>
           <Text style={styles.invoiceTitle}>
             Invoice #{selectedOrder.order_id}
           </Text>
+
+          <Text style={styles.text}>Date: {selectedOrder.date}</Text>
 
           <Text style={styles.textBold}>
             Supplier: {selectedOrder.supplier}
@@ -98,12 +114,12 @@ const OrdersScreen = () => {
 
           <Row label="Product" value={selectedOrder.product} />
           <Row label="Quantity" value={selectedOrder.quantity} />
-          <Row label="Transport" value="$80" />
-          <Row label="Tax" value="$20" />
+          <Row label="Transport" value={formatDZD(80)} />
+          <Row label="Tax" value={formatDZD(20)} />
 
           <View style={styles.divider} />
 
-          <Row label="Total" value={`$${selectedOrder.amount}`} bold />
+          <Row label="Total" value={formatDZD(selectedOrder.amount)} bold />
 
           <TouchableOpacity style={styles.button}>
             <Text style={styles.buttonText}>Download Invoice</Text>
@@ -154,11 +170,12 @@ const styles = StyleSheet.create({
 
   orderCard: {
     backgroundColor: "#fff",
-    padding: 12,
+    padding: 14,
     borderRadius: 10,
-    marginBottom: 8,
+    marginBottom: 10,
     flexDirection: "row",
     justifyContent: "space-between",
+    elevation: 2,
   },
 
   selected: {
@@ -166,8 +183,30 @@ const styles = StyleSheet.create({
     borderColor: "#0df20d",
   },
 
+  orderLeft: {
+    flex: 1,
+  },
+
+  orderRight: {
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+  },
+
   orderId: {
     fontWeight: "bold",
+    fontSize: 14,
+  },
+
+  product: {
+    fontWeight: "600",
+    fontSize: 15,
+    marginTop: 2,
+  },
+
+  date: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 4,
   },
 
   text: {
@@ -180,13 +219,14 @@ const styles = StyleSheet.create({
 
   price: {
     fontWeight: "bold",
+    fontSize: 16,
   },
 
   badge: {
-    marginTop: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
 
   badgeText: {
@@ -195,6 +235,7 @@ const styles = StyleSheet.create({
   },
 
   invoice: {
+    flex: 1,
     marginTop: 10,
     backgroundColor: "#fff",
     padding: 16,
@@ -202,7 +243,7 @@ const styles = StyleSheet.create({
   },
 
   invoiceTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
     marginBottom: 10,
   },
@@ -230,16 +271,10 @@ const styles = StyleSheet.create({
   buttonText: {
     fontWeight: "bold",
   },
-});
 
-/*useEffect(() => {
-  fetch("http://your-api.com/api/orders/")
-    .then(res => res.json())
-    .then(data => setOrders(data));
-}, []);
-# models.py
-class Order(models.Model):
-    buyer = models.ForeignKey(User)
-    supplier = models.CharField(max_length=255)
-    total = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=50)*/
+  empty: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});

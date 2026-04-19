@@ -1,4 +1,3 @@
-// CheckoutScreen.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -12,8 +11,12 @@ import {
 
 import { Product, Transporter } from "../../types/types";
 
+/* 🇩🇿 Currency formatter */
+const formatDZD = (value: number) => {
+  return value.toFixed(2) + " DZD";
+};
+
 const CheckoutScreen = () => {
-  // 🟢 Mock data (replace with API from Django)
   const [products] = useState<Product[]>([
     {
       id: 1,
@@ -44,7 +47,7 @@ const CheckoutScreen = () => {
   ]);
 
   const [selectedTransporter, setSelectedTransporter] = useState<Transporter>(
-    transporters[0],
+    transporters[0]
   );
 
   const [card, setCard] = useState({
@@ -54,10 +57,10 @@ const CheckoutScreen = () => {
     name: "",
   });
 
-  // 🧮 Calculations
+  /* Calculations */
   const subtotal = products.reduce(
     (acc, item) => acc + item.price * item.quantity,
-    0,
+    0
   );
 
   const total = subtotal + selectedTransporter.price;
@@ -66,7 +69,7 @@ const CheckoutScreen = () => {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Checkout</Text>
 
-      {/* 📍 Delivery Address */}
+      {/* Delivery Address */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Delivery Address</Text>
         <Text style={styles.textBold}>Farm Warehouse</Text>
@@ -74,7 +77,7 @@ const CheckoutScreen = () => {
         <Text style={styles.text}>+213 XXX XXX</Text>
       </View>
 
-      {/* 🚚 Transporters */}
+      {/* Transporters */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Select Transporter</Text>
 
@@ -94,12 +97,12 @@ const CheckoutScreen = () => {
               </Text>
             </View>
 
-            <Text style={styles.price}>${t.price}</Text>
+            <Text style={styles.price}>{formatDZD(t.price)}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* 💳 Payment */}
+      {/* Payment */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Payment Method</Text>
 
@@ -117,6 +120,7 @@ const CheckoutScreen = () => {
             value={card.expiry}
             onChangeText={(v) => setCard({ ...card, expiry: v })}
           />
+
           <TextInput
             placeholder="CVC"
             style={[styles.input, { flex: 1 }]}
@@ -133,29 +137,33 @@ const CheckoutScreen = () => {
         />
       </View>
 
-      {/* 🧾 Order Summary */}
+      {/* Order Summary */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Order Summary</Text>
 
         {products.map((p) => (
           <View key={p.id} style={styles.productRow}>
             <Image source={{ uri: p.image }} style={styles.image} />
+
             <View style={{ flex: 1 }}>
               <Text style={styles.textBold}>{p.name}</Text>
               <Text style={styles.text}>
                 {p.quantity} {p.unit}
               </Text>
             </View>
-            <Text style={styles.price}>${p.price * p.quantity}</Text>
+
+            <Text style={styles.price}>
+              {formatDZD(p.price * p.quantity)}
+            </Text>
           </View>
         ))}
 
         <View style={styles.divider} />
 
-        <Row label="Subtotal" value={`$${subtotal}`} />
-        <Row label="Transport" value={`$${selectedTransporter.price}`} />
+        <Row label="Subtotal" value={formatDZD(subtotal)} />
+        <Row label="Transport" value={formatDZD(selectedTransporter.price)} />
 
-        <Row label="Total" value={`$${total}`} bold />
+        <Row label="Total" value={formatDZD(total)} bold />
 
         <TouchableOpacity style={styles.button}>
           <Text style={styles.buttonText}>Confirm Payment</Text>

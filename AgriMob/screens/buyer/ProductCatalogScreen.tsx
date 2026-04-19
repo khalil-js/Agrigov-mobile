@@ -14,6 +14,11 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MarketStackParamList } from "../../navigation/BuyerTabNavigator";
 import { api } from "../../api/client";
 
+/* 🇩🇿 Algerian currency formatter */
+const formatDZD = (value: number) => {
+  return value.toFixed(2) + " DZD";
+};
+
 interface Product {
   id: string;
   name: string;
@@ -30,18 +35,19 @@ interface Product {
 const ProductCatalogScreen = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<MarketStackParamList>>();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // 🔗 Connect to Django backend
   const fetchProducts = async () => {
     try {
       const response = await api.get("/products/");
       setProducts(response.data);
     } catch (error) {
       console.error("Error fetching products:", error);
-      // Static data for testing
+
+      /* fallback data */
       setProducts([
         {
           id: "1",
@@ -78,7 +84,7 @@ const ProductCatalogScreen = () => {
   }, []);
 
   const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()),
+    p.name.toLowerCase().includes(search.toLowerCase())
   );
 
   const renderItem = ({ item }: { item: Product }) => (
@@ -102,7 +108,7 @@ const ProductCatalogScreen = () => {
         <View style={styles.bottomRow}>
           <View>
             <Text style={styles.price}>
-              ${item.price} / {item.unit}
+              {formatDZD(item.price)} / {item.unit}
             </Text>
           </View>
 
@@ -125,7 +131,6 @@ const ProductCatalogScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* 🔍 Search */}
       <TextInput
         placeholder="Search products..."
         value={search}
@@ -133,7 +138,6 @@ const ProductCatalogScreen = () => {
         style={styles.search}
       />
 
-      {/* 📦 Product List */}
       <FlatList
         data={filteredProducts}
         keyExtractor={(item) => item.id}
@@ -152,6 +156,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f8f5",
     padding: 10,
   },
+
   search: {
     backgroundColor: "#fff",
     padding: 12,
@@ -160,6 +165,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ddd",
   },
+
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
@@ -167,74 +173,71 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     elevation: 3,
   },
+
   image: {
     width: "100%",
     height: 160,
   },
+
   cardContent: {
     padding: 12,
   },
+
   category: {
     color: "#2db32d",
     fontSize: 12,
     fontWeight: "600",
   },
+
   title: {
     fontSize: 18,
     fontWeight: "bold",
     marginVertical: 4,
   },
+
   description: {
     fontSize: 13,
     color: "#666",
     marginBottom: 8,
   },
+
   locationRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 10,
   },
+
   location: {
     fontSize: 12,
     color: "#444",
   },
+
   grade: {
     fontSize: 12,
     color: "#0df20d",
     fontWeight: "600",
   },
+
   bottomRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
+
   price: {
     fontSize: 16,
     fontWeight: "bold",
   },
+
   button: {
     backgroundColor: "#0df20d",
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
   },
+
   buttonText: {
     fontWeight: "bold",
     color: "#000",
   },
 });
-
-[
-  {
-    id: "1",
-    name: "Tomatoes",
-    category: "Vegetables",
-    description: "Fresh tomatoes",
-    price: 24.5,
-    unit: "20kg",
-    image: "https://...",
-    location: "Jijel Farm",
-    grade: "A",
-    created_at: "2026-04-10",
-  },
-];

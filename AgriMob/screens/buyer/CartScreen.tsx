@@ -5,13 +5,14 @@ import {
   FlatList,
   Image,
   TouchableOpacity,
-  TextInput,
   StyleSheet,
-  ScrollView,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MarketStackParamList } from "../../navigation/BuyerTabNavigator";
+
+const formatDZD = (value: number) =>
+  "DZD " + new Intl.NumberFormat("fr-DZ").format(value);
 
 const initialCart = [
   {
@@ -37,52 +38,50 @@ const initialCart = [
 export default function CartScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<MarketStackParamList>>();
+
   const [cart, setCart] = useState(initialCart);
 
-  // 🔢 Update Quantity
   const updateQuantity = (id: string, delta: number) => {
     setCart((prev) =>
       prev.map((item) =>
         item.id === id
           ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-          : item,
-      ),
+          : item
+      )
     );
   };
 
-  // ❌ Remove Item
   const removeItem = (id: string) => {
     setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // 💰 Calculations
   const subtotal = useMemo(
     () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [cart],
+    [cart]
   );
 
   const transport = 45000;
   const levy = subtotal * 0.01;
   const total = subtotal + transport + levy;
 
-  // 📦 Render Item
   const renderItem = ({ item }: any) => (
     <View style={styles.card}>
       <Image source={{ uri: item.image }} style={styles.image} />
 
-      <View style={{ flex: 1 }}>
+      <View style={styles.content}>
         <Text style={styles.title}>{item.name}</Text>
+
         <Text style={styles.price}>
-          ₦{item.price} / {item.unit}
+          {formatDZD(item.price)} / {item.unit}
         </Text>
 
-        {/* Quantity Controls */}
-        <View style={styles.row}>
+        {/* Quantity Stepper */}
+        <View style={styles.qtyRow}>
           <TouchableOpacity
             onPress={() => updateQuantity(item.id, -1)}
             style={styles.qtyBtn}
           >
-            <Text>-</Text>
+            <Text style={styles.qtyText}>−</Text>
           </TouchableOpacity>
 
           <Text style={styles.qty}>{item.quantity}</Text>
@@ -91,18 +90,28 @@ export default function CartScreen() {
             onPress={() => updateQuantity(item.id, 1)}
             style={styles.qtyBtn}
           >
-            <Text>+</Text>
+            <Text style={styles.qtyText}>+</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.subtotal}>₦{item.price * item.quantity}</Text>
+        <Text style={styles.subtotal}>
+          {formatDZD(item.price * item.quantity)}
+        </Text>
       </View>
 
       <TouchableOpacity onPress={() => removeItem(item.id)}>
-        <Text style={styles.remove}>Remove</Text>
+        <Text style={styles.remove}>✕</Text>
       </TouchableOpacity>
     </View>
   );
+
+  if (cart.length === 0) {
+    return (
+      <View style={styles.empty}>
+        <Text>Your cart is empty</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -115,86 +124,131 @@ export default function CartScreen() {
 
       {/* Summary */}
       <View style={styles.summary}>
-        <Text style={styles.summaryText}>Subtotal: ₦{subtotal}</Text>
-        <Text style={styles.summaryText}>Transport: ₦{transport}</Text>
-        <Text style={styles.summaryText}>Levy (1%): ₦{levy.toFixed(2)}</Text>
+        <Text style={styles.summaryText}>
+          Subtotal: {formatDZD(subtotal)}
+        </Text>
 
-        <Text style={styles.total}>Total: ₦{total.toFixed(2)}</Text>
+        <Text style={styles.summaryText}>
+          Transport: {formatDZD(transport)}
+        </Text>
+
+        <Text style={styles.summaryText}>
+          Levy (1%): {formatDZD(levy)}
+        </Text>
+
+        <Text style={styles.total}>
+          Total: {formatDZD(total)}
+        </Text>
 
         <TouchableOpacity
           style={styles.checkoutBtn}
           onPress={() => navigation.navigate("Checkout")}
         >
-          <Text style={{ fontWeight: "bold" }}>Proceed to Checkout</Text>
+          <Text style={styles.checkoutText}>Proceed to Checkout</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-// 🎨 Styles
 const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     backgroundColor: "#fff",
-    padding: 12,
+    padding: 14,
     marginBottom: 12,
-    borderRadius: 10,
-    elevation: 2,
+    borderRadius: 12,
+    elevation: 3,
   },
+
   image: {
     width: 80,
     height: 80,
-    borderRadius: 8,
-    marginRight: 10,
+    borderRadius: 10,
+    marginRight: 12,
   },
+
+  content: {
+    flex: 1,
+  },
+
   title: {
     fontWeight: "bold",
-    marginBottom: 4,
+    fontSize: 15,
   },
+
   price: {
-    color: "gray",
-    marginBottom: 6,
+    color: "#555",
+    marginVertical: 4,
   },
-  row: {
+
+  qtyRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
+    marginTop: 4,
   },
+
   qtyBtn: {
-    padding: 6,
-    backgroundColor: "#ddd",
-    borderRadius: 5,
+    width: 28,
+    height: 28,
+    backgroundColor: "#eee",
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
   },
+
+  qtyText: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+
   qty: {
     marginHorizontal: 10,
     fontWeight: "bold",
   },
+
   subtotal: {
     fontWeight: "bold",
+    marginTop: 6,
   },
+
   remove: {
+    fontSize: 18,
     color: "red",
-    fontSize: 12,
   },
+
   summary: {
-    padding: 16,
+    padding: 18,
     borderTopWidth: 1,
     borderColor: "#eee",
     backgroundColor: "#fafafa",
   },
+
   summaryText: {
     marginBottom: 4,
+    color: "#555",
   },
+
   total: {
     fontWeight: "bold",
-    fontSize: 18,
+    fontSize: 20,
     marginVertical: 10,
   },
+
   checkoutBtn: {
     backgroundColor: "#0df20d",
     padding: 14,
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: 10,
+  },
+
+  checkoutText: {
+    fontWeight: "bold",
+  },
+
+  empty: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

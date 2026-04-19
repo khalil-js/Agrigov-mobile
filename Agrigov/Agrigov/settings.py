@@ -18,7 +18,7 @@ load_dotenv()
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("SECRET_KEY")
 DEBUG = True
-ALLOWED_HOSTS = ["192.168.1.100","127.0.0.1", "localhost"]
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -94,6 +94,8 @@ CORS_ALLOWED_ORIGINS = [
         "http://10.0.2.2:8000",
         "http://10.0.2.2:3000",
         "http://192.168.1.100:3000",
+        "http://192.168.1.12:8081",
+        "http://192.168.1.12:3000",
     ]
 TEMPLATES = [
     {

@@ -13,6 +13,11 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MarketStackParamList } from "../../navigation/BuyerTabNavigator";
 import { api } from "../../api/client";
 
+/* 🇩🇿 Currency formatter */
+const formatDZD = (value: number) => {
+  return value.toFixed(2) + " DZD";
+};
+
 interface Product {
   id: string;
   name: string;
@@ -34,6 +39,7 @@ interface Product {
 const ProductDetailsScreen = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<MarketStackParamList>>();
+
   const route = useRoute();
   const { productId } = route.params as { productId: string };
 
@@ -50,7 +56,7 @@ const ProductDetailsScreen = () => {
       setSelectedImage(data.images[0]);
     } catch (err) {
       console.log(err);
-      // Static data for testing
+
       const staticProduct: Product = {
         id: productId,
         name: "Fresh Tomatoes",
@@ -73,6 +79,7 @@ const ProductDetailsScreen = () => {
           avatar: "https://via.placeholder.com/100",
         },
       };
+
       setProduct(staticProduct);
       setSelectedImage(staticProduct.images[0]);
     }
@@ -86,7 +93,7 @@ const ProductDetailsScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      {/* 🖼 Gallery */}
+      {/* Product Gallery */}
       <Image source={{ uri: selectedImage }} style={styles.mainImage} />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -103,17 +110,20 @@ const ProductDetailsScreen = () => {
         ))}
       </ScrollView>
 
-      {/* 📦 Product Info */}
+      {/* Product Info */}
       <View style={styles.section}>
         <Text style={styles.title}>{product.name}</Text>
+
         <Text style={styles.price}>
-          ${product.price} / {product.unit}
+          {formatDZD(product.price)} / {product.unit}
         </Text>
+
         <Text style={styles.location}>📍 {product.location}</Text>
+
         <Text style={styles.grade}>Grade: {product.grade}</Text>
       </View>
 
-      {/* 📑 Tabs */}
+      {/* Tabs */}
       <View style={styles.tabs}>
         <TouchableOpacity onPress={() => setActiveTab("specs")}>
           <Text style={[styles.tab, activeTab === "specs" && styles.activeTab]}>
@@ -130,7 +140,7 @@ const ProductDetailsScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* 📊 Tab Content */}
+      {/* Tab Content */}
       <View style={styles.section}>
         {activeTab === "specs" &&
           Object.entries(product.specifications).map(([key, value]) => (
@@ -145,7 +155,7 @@ const ProductDetailsScreen = () => {
         )}
       </View>
 
-      {/* 🧑‍🌾 Farmer */}
+      {/* Farmer Info */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Farmer</Text>
 
@@ -154,15 +164,20 @@ const ProductDetailsScreen = () => {
             source={{ uri: product.farmer.avatar }}
             style={styles.avatar}
           />
+
           <View>
             <Text style={styles.farmerName}>{product.farmer.name}</Text>
-            <Text style={styles.farmerInfo}>📍 {product.farmer.location}</Text>
-            <Text style={styles.farmerInfo}>⭐ {product.farmer.rating}</Text>
+            <Text style={styles.farmerInfo}>
+              📍 {product.farmer.location}
+            </Text>
+            <Text style={styles.farmerInfo}>
+              ⭐ {product.farmer.rating}
+            </Text>
           </View>
         </View>
       </View>
 
-      {/* 🛒 Order Section */}
+      {/* Order Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Order</Text>
 
@@ -198,90 +213,111 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f8f5",
   },
+
   mainImage: {
     width: "100%",
     height: 250,
   },
+
   thumbnail: {
     width: 70,
     height: 70,
     margin: 5,
     borderRadius: 8,
   },
+
   activeThumb: {
     borderWidth: 2,
     borderColor: "#0df20d",
   },
+
   section: {
     padding: 15,
     backgroundColor: "#fff",
     marginTop: 10,
   },
+
   title: {
     fontSize: 20,
     fontWeight: "bold",
   },
+
   price: {
     fontSize: 18,
     fontWeight: "bold",
     marginVertical: 5,
   },
+
   location: {
     color: "#555",
   },
+
   grade: {
     color: "#0df20d",
     fontWeight: "600",
   },
+
   tabs: {
     flexDirection: "row",
     justifyContent: "space-around",
     backgroundColor: "#fff",
     marginTop: 10,
   },
+
   tab: {
     padding: 10,
     color: "#888",
   },
+
   activeTab: {
     color: "#0df20d",
     fontWeight: "bold",
   },
+
   specRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 6,
   },
+
   specKey: {
     color: "#666",
   },
+
   specValue: {
     fontWeight: "600",
   },
+
   description: {
     color: "#555",
   },
+
   sectionTitle: {
     fontWeight: "bold",
     marginBottom: 10,
   },
+
   farmerRow: {
     flexDirection: "row",
     gap: 10,
     alignItems: "center",
   },
+
   avatar: {
     width: 50,
     height: 50,
     borderRadius: 25,
   },
+
   farmerName: {
     fontWeight: "bold",
   },
+
   farmerInfo: {
     fontSize: 12,
     color: "#555",
   },
+
   input: {
     borderWidth: 1,
     borderColor: "#ddd",
@@ -289,6 +325,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 10,
   },
+
   primaryBtn: {
     backgroundColor: "#0df20d",
     padding: 12,
@@ -296,6 +333,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
+
   secondaryBtn: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -303,28 +341,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
   },
+
   btnText: {
     fontWeight: "bold",
   },
 });
-/*
-{
-  "id": "1",
-  "name": "Yellow Maize",
-  "price": 240,
-  "unit": "Ton",
-  "location": "Nakuru",
-  "grade": "A",
-  "description": "...",
-  "images": ["url1", "url2"],
-  "specifications": {
-    "Moisture": "12.8%",
-    "Broken Grains": "<2.5%"
-  },
-  "farmer": {
-    "name": "Green Valley Co-op",
-    "rating": 4.8,
-    "location": "Nakuru",
-    "avatar": "url"
-  }
-}*/
