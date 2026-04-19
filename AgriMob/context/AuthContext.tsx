@@ -1,127 +1,107 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
-import { AuthUser } from "../types/Auth";
-import { authApi } from "../api/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// AsyncStorage might not be available in web or during initial load
-const safeGetItem = async (key: string): Promise<string | null> => {
-  try {
-    return await AsyncStorage.getItem(key);
-  } catch {
-    return null;
-  }
-};
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { storage } from "../apis/storage";
+import { authApi, AuthUser, RegisterPayload } from "../apis/auth";
 
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (
-    email: string,
-    password: string,
-  ) => Promise<{ success: boolean; error?: string }>;
-  register: (payload: {
-    email: string;
-    username: string;
-    phone: string;
-    role: "FARMER" | "BUYER" | "TRANSPORTER";
-    password: string;
-  }) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<void>;
-  setUser: (user: AuthUser | null) => void;
+  login:    (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (payload: RegisterPayload)        => Promise<{ success: boolean; error?: string }>;
+  logout:   ()                                => Promise<void>;
+  setUser:  (user: AuthUser | null)           => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user,      setUser]      = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Restore session on app start
   useEffect(() => {
-    loadStoredUser();
+    (async () => {
+      try {
+        const [savedUser, token] = await Promise.all([
+          storage.getUser(),
+          storage.getToken(),
+        ]);
+        if (savedUser && token) {
+          setUser(savedUser);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   }, []);
 
-  const loadStoredUser = async () => {
-    try {
-      const userStr = await safeGetItem("user");
-      if (userStr) {
-        const userData = JSON.parse(userStr);
-        setUser(userData);
-      }
-      // Don't set static user - let user choose role
-    } catch (error) {
-      // Don't set static user on error
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // ── Login ─────────────────────────────────────────────────────────────────
+  // Django: POST /api/users/auth/login/
+  // Response: { data: { access, refresh, user } }
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await authApi.login(email, password);
-      setUser(response.data.user);
+      const res = await authApi.login(email, password);
+      const { access, refresh, user: userData } = res.data;
+
+      // Save everything so api.ts can read the token on future requests
+      await Promise.all([
+        storage.setToken(access),
+        storage.setRefresh(refresh),
+        storage.setUser(userData),
+      ]);
+      setUser(userData);
       return { success: true };
-    } catch (error: any) {
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "Login failed. Please check your credentials.";
-      return { success: false, error: message };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Login failed." };
     }
   };
 
-  const register = async (payload: {
-    email: string;
-    username: string;
-    phone: string;
-    role: "FARMER" | "BUYER" | "TRANSPORTER";
-    password: string;
-  }) => {
+  // ── Register ──────────────────────────────────────────────────────────────
+  // Django: POST /api/users/auth/register/
+  // Response: { data: { user, tokens: { access, refresh } } }
+
+  const register = async (payload: RegisterPayload) => {
     try {
-      const response = await authApi.register(payload);
-      setUser(response.data.user);
+      const res = await authApi.register(payload);
+      const { user: userData, tokens } = res.data;
+
+      await Promise.all([
+        storage.setToken(tokens.access),
+        storage.setRefresh(tokens.refresh),
+        storage.setUser(userData),
+      ]);
+      setUser(userData);
       return { success: true };
-    } catch (error: any) {
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "Registration failed. Please try again.";
-      return { success: false, error: message };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Registration failed." };
     }
   };
+
+  // ── Logout ────────────────────────────────────────────────────────────────
 
   const logout = async () => {
-    await authApi.logout();
     setUser(null);
+    await storage.clearAll();
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        register,
-        logout,
-        setUser,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user,
+      isLoading,
+      isAuthenticated: !!user,
+      login,
+      register,
+      logout,
+      setUser,
+    }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within an AuthProvider");
+  return ctx;
 }

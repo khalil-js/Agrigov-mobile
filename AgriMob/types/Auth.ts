@@ -1,42 +1,49 @@
-
-
-export type UserRole = "FARMER" | "BUYER" | "TRANSPORTER" | "ADMIN";
-
-export const ROLE_DASHBOARD: Record<UserRole, string> = {
-  FARMER:      "/farmer/profile",
-  BUYER:       "/buyer/profile",
-  TRANSPORTER: "/Transporter/profile",
-  ADMIN:    "/Ministry/dashboard  ",
-};
+// Matches Django UserSerializer:
+// fields = ["id", "email", "username", "phone", "role", "is_verified", "is_active", "created_at"]
 
 export interface AuthUser {
   id: number;
   email: string;
   username: string;
   phone: string;
-  role: UserRole;
+  role: "FARMER" | "BUYER" | "TRANSPORTER" | "ADMIN";
   is_verified: boolean;
   is_active: boolean;
   created_at: string;
 }
 
-export interface LoginPayload {
-  access: string;
-  refresh: string;
-  user: AuthUser;
+// Django LoginView response shape:
+// { status, code, message, data: { access, refresh, user } }
+export interface LoginResponse {
+  status: string;
+  code: number;
+  message: string;
+  data: {
+    access: string;
+    refresh: string;
+    user: AuthUser;
+  };
 }
 
-
-export interface StatBadge {
-  value: string;
-  label: string;
-  icon: string;
+// Django RegisterView response shape:
+// { status, code, message, data: { user, tokens: { access, refresh } } }
+export interface RegisterResponse {
+  status: string;
+  code: number;
+  message: string;
+  data: {
+    user: AuthUser;
+    tokens: {
+      access: string;
+      refresh: string;
+    };
+  };
 }
 
-
-export const fallbackStats: StatBadge[] = [
-  { value: "2.4M+", label: "Registered Farmers",  icon: "grass"          },
-  { value: "100%",  label: "Verified Buyers",      icon: "storefront"     },
-  { value: "12K+",  label: "Active Transporters",  icon: "local_shipping" },
-  { value: "48",    label: "Wilayas Covered",      icon: "map"            },
-];
+export interface RegisterPayload {
+  email: string;
+  username: string;
+  phone: string;
+  role: "FARMER" | "BUYER" | "TRANSPORTER";
+  password: string;
+}
