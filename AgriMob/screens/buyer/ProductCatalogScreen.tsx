@@ -12,7 +12,7 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MarketStackParamList } from "../../navigation/BuyerTabNavigator";
-import { api } from "../../api/client";
+import { productApi } from "../../apis/product.api";
 
 /* 🇩🇿 Algerian currency formatter */
 const formatDZD = (value: number) => {
@@ -42,38 +42,25 @@ const ProductCatalogScreen = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await api.get("/products/");
-      setProducts(response.data);
+      const response: any = await productApi.list("");
+      const results = response.results ? response.results : response;
+      
+      const mappedProducts = results.map((item: any) => ({
+        id: item.id.toString(),
+        name: item.ministry_product?.name || "Unknown Product",
+        category: item.category_name || "Uncategorized",
+        description: item.description,
+        price: parseFloat(item.unit_price) || 0,
+        unit: "kg", // Defaults to kg
+        image: item.images?.[0]?.image || "https://via.placeholder.com/200",
+        location: item.farm?.wilaya || "Unknown Location",
+        grade: "A", // Placeholder
+        created_at: item.created_at,
+      }));
+      
+      setProducts(mappedProducts);
     } catch (error) {
       console.error("Error fetching products:", error);
-
-      /* fallback data */
-      setProducts([
-        {
-          id: "1",
-          name: "Fresh Tomatoes",
-          category: "Vegetables",
-          description: "Organic red tomatoes from local farms",
-          price: 2.5,
-          unit: "kg",
-          image: "https://via.placeholder.com/200",
-          location: "Algiers",
-          grade: "A",
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "2",
-          name: "Premium Rice",
-          category: "Grains",
-          description: "High quality rice grains",
-          price: 3.0,
-          unit: "kg",
-          image: "https://via.placeholder.com/200",
-          location: "Oran",
-          grade: "A",
-          created_at: new Date().toISOString(),
-        },
-      ]);
     } finally {
       setLoading(false);
     }

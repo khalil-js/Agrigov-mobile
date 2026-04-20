@@ -136,31 +136,6 @@ export default function FarmerDashboard() {
         </View>
       </ScrollView>
 
-      {/* BOTTOM NAV */}
-      <View style={styles.bottomNav}>
-        {[
-          { icon: "home", label: "Home", active: true },
-          { icon: "grass", label: "Yields" },
-          { icon: "local-shipping", label: "Logistics" },
-          { icon: "person", label: "Account" },
-        ].map((item, i) => (
-          <TouchableOpacity key={i} style={styles.navItem}>
-            <MaterialIcons
-              name={item.icon as any}
-              size={24}
-              color={item.active ? "#047857" : "#6b7280"}
-            />
-            <Text
-              style={[
-                styles.navText,
-                item.active && { color: "#047857" },
-              ]}
-            >
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
     </SafeAreaView>
   );
 }

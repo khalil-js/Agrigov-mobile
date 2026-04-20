@@ -4,28 +4,16 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import BuyerTabNavigator from "./BuyerTabNavigator";
 import FarmerTabNavigator from "./FarmerTabNavigator";
-
-// Placeholder for TransporterTabNavigator — replace with the real import when ready
-function TransporterPlaceholder() {
-  return (
-    <View style={styles.placeholder}>
-      <MaterialIcons name="local-shipping" size={64} color="#13ec13" />
-      <Text style={styles.title}>Transporter Dashboard</Text>
-      <Text style={styles.subtitle}>Coming soon</Text>
-    </View>
-  );
-}
+import TransporterTabNavigator from "./TransporterTabNavigator";
 
 export default function AppNavigator() {
   const { user } = useAuth();
 
-  // user is guaranteed non-null here because App.tsx only renders
-  // AppNavigator when isAuthenticated === true
   switch (user?.role) {
     case "BUYER":       return <BuyerTabNavigator />;
     case "FARMER":      return <FarmerTabNavigator />;
-    case "TRANSPORTER": return <TransporterPlaceholder />;
-    default:            return null; // ADMIN or unknown — handle separately
+    case "TRANSPORTER": return <TransporterTabNavigator />;
+    default:            return null;
   }
 }
 

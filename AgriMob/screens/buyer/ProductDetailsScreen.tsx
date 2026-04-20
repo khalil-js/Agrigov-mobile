@@ -11,7 +11,9 @@ import {
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MarketStackParamList } from "../../navigation/BuyerTabNavigator";
-import { api } from "../../api/client";
+import { productApi } from "../../apis/product.api";
+import { cartApi } from "../../apis/cart.api";
+import { Alert, ActivityIndicator } from "react-native";
 
 /* 🇩🇿 Currency formatter */
 const formatDZD = (value: number) => {
@@ -47,41 +49,57 @@ const ProductDetailsScreen = () => {
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [quantity, setQuantity] = useState("10");
   const [activeTab, setActiveTab] = useState("specs");
+  const [addingToCart, setAddingToCart] = useState(false);
 
   const fetchProduct = async () => {
     try {
-      const res = await api.get(`/products/${productId}/`);
-      const data = res.data;
-      setProduct(data);
-      setSelectedImage(data.images[0]);
-    } catch (err) {
-      console.log(err);
-
-      const staticProduct: Product = {
-        id: productId,
-        name: "Fresh Tomatoes",
-        description:
-          "Organic red tomatoes from local farms. Perfect for salads and cooking.",
-        price: 2.5,
+      const data: any = await productApi.detail(productId);
+      
+      const mappedProduct: Product = {
+        id: data.id.toString(),
+        name: data.ministry_product?.name || "Unknown Product",
+        description: data.description,
+        price: parseFloat(data.unit_price) || 0,
         unit: "kg",
-        images: ["https://via.placeholder.com/400"],
-        location: "Algiers",
-        grade: "A",
+        images: data.images?.length > 0 
+          ? data.images.map((img: any) => img.image)
+          : ["https://via.placeholder.com/400"],
+        location: data.farm?.wilaya || "Unknown Location",
+        grade: "A", // Default grade
         specifications: {
-          Type: "Roma",
-          Origin: "Local Farm",
-          "Shelf Life": "7 days",
+          Category: data.category_name || "N/A",
+          Season: data.season || "N/A",
+          Stock: `${data.stock} available`,
         },
         farmer: {
-          name: "Ahmed Farm",
-          rating: 4.5,
-          location: "Algiers",
-          avatar: "https://via.placeholder.com/100",
+          name: data.farmer_name || "Unknown Farmer",
+          rating: data.average_rating || 5.0,
+          location: data.farm?.wilaya || "Unknown",
+          avatar: "https://via.placeholder.com/100", // Add avatar logic if backend provides it
         },
       };
 
-      setProduct(staticProduct);
-      setSelectedImage(staticProduct.images[0]);
+      setProduct(mappedProduct);
+      setSelectedImage(mappedProduct.images[0]);
+    } catch (err) {
+      console.log(err);
+      Alert.alert("Error", "Could not fetch product details.");
+    }
+  };
+
+  const handleAddToCart = async () => {
+    if (!product) return;
+    
+    setAddingToCart(true);
+    try {
+      await cartApi.add(Number(product.id), Number(quantity));
+      Alert.alert("Success", "Product added to cart!");
+      navigation.getParent()?.navigate("Cart");
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to add product to cart.");
+    } finally {
+      setAddingToCart(false);
     }
   };
 
@@ -197,9 +215,10 @@ const ProductDetailsScreen = () => {
 
         <TouchableOpacity
           style={styles.secondaryBtn}
-          onPress={() => navigation.getParent()?.navigate("Cart")}
+          onPress={handleAddToCart}
+          disabled={addingToCart}
         >
-          <Text>Add to Cart</Text>
+          {addingToCart ? <ActivityIndicator color="#000" /> : <Text>Add to Cart</Text>}
         </TouchableOpacity>
       </View>
     </ScrollView>

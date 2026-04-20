@@ -6,57 +6,75 @@ import {
   Image,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MarketStackParamList } from "../../navigation/BuyerTabNavigator";
+import { cartApi } from "../../apis/cart.api";
+import { ActivityIndicator } from "react-native";
 
 const formatDZD = (value: number) =>
   "DZD " + new Intl.NumberFormat("fr-DZ").format(value);
-
-const initialCart = [
-  {
-    id: "1",
-    name: "Red Onions (Grade A)",
-    price: 450,
-    unit: "kg",
-    quantity: 500,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDRX1VdVsHDaRcZkEZac-eIkOIay9Hr7u8lkWzsY1ozNnDYtcp7rbNQNZxpXbB-uGS8e2i9cr_uWRDRKcaCzoLI33uC5U3yphbuc-os3oeDBifcxFo5Hvr6U9UWEdVtPWnJs9N8A1xWYae-kkjE6BJW_byurrq2UBCUkfiWUT0w76i4H41VTf3oH-Upht5iixYDm4-E9aEzZMQcm5FYzdsdnw7plfPfhQBWE2MrqUlx7Q8h5AvXJmwPudFYkphr2ehBtLLotJ2rrUxn",
-  },
-  {
-    id: "2",
-    name: "Tomatoes (Roma)",
-    price: 8000,
-    unit: "crate",
-    quantity: 20,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuAraINWmh9-C--w-kQq0vqOsAddguYplP1TMvNN8JlrlDBQxotpFOm1LyKgwimlieaxO1k3-Ze5SolQ9YEsztrm3Qwj0u9xk18XPzNP_YLhxFD256vusl9k774_cGPXlMbCLPiB5tLmfN43XlpTemL6whP6hPGz4YZIIbGcemsDw1tBJKgDn1vG5YlruRWf-Fdw-wOt9ZsQKupu46lRkShifuKN_djZCQWoRxw3pSKje1o4DSUXOHtZ28ADllxUONQQjUicn1RcaCCB",
-  },
-];
 
 export default function CartScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<MarketStackParamList>>();
 
-  const [cart, setCart] = useState(initialCart);
+  const [cart, setCart] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const updateQuantity = (id: string, delta: number) => {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-          : item
-      )
-    );
+  const fetchCart = async () => {
+    try {
+      const res: any = await cartApi.get();
+      setCart(res.items || []);
+    } catch (err: any) {
+      console.error(err);
+      if (err.message) {
+        Alert.alert("Cart Error", err.message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const removeItem = (id: string) => {
+  React.useEffect(() => {
+    fetchCart();
+  }, []);
+
+  const updateQuantity = async (id: number, delta: number) => {
+    const item = cart.find(i => i.id === id);
+    if (!item) return;
+    
+    const newQuantity = Math.max(1, item.quantity + delta);
+    
+    // Optimistic UI update
+    setCart((prev) =>
+      prev.map((i) =>
+        i.id === id ? { ...i, quantity: newQuantity, total_price: i.price * newQuantity } : i
+      )
+    );
+
+    try {
+      await cartApi.update(id, newQuantity);
+    } catch (error) {
+      console.error(error);
+      fetchCart(); // Revert on failure
+    }
+  };
+
+  const removeItem = async (id: number) => {
     setCart((prev) => prev.filter((item) => item.id !== id));
+    try {
+      await cartApi.remove(id);
+    } catch (error) {
+      console.error(error);
+      fetchCart();
+    }
   };
 
   const subtotal = useMemo(
-    () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    () => cart.reduce((sum, item) => sum + parseFloat(item.total_price || 0), 0),
     [cart]
   );
 
@@ -64,46 +82,56 @@ export default function CartScreen() {
   const levy = subtotal * 0.01;
   const total = subtotal + transport + levy;
 
-  const renderItem = ({ item }: any) => (
-    <View style={styles.card}>
-      <Image source={{ uri: item.image }} style={styles.image} />
+  const renderItem = ({ item }: any) => {
+    const product = item.product || {};
+    const title = product.ministry_product?.name || "Unknown Product";
+    const imageUri = product.images?.[0]?.image || "https://via.placeholder.com/80";
 
-      <View style={styles.content}>
-        <Text style={styles.title}>{item.name}</Text>
+    return (
+      <View style={styles.card}>
+        <Image source={{ uri: imageUri }} style={styles.image} />
 
-        <Text style={styles.price}>
-          {formatDZD(item.price)} / {item.unit}
-        </Text>
+        <View style={styles.content}>
+          <Text style={styles.title}>{title}</Text>
 
-        {/* Quantity Stepper */}
-        <View style={styles.qtyRow}>
-          <TouchableOpacity
-            onPress={() => updateQuantity(item.id, -1)}
-            style={styles.qtyBtn}
-          >
-            <Text style={styles.qtyText}>−</Text>
-          </TouchableOpacity>
+          <Text style={styles.price}>
+            {formatDZD(parseFloat(item.price))} / kg
+          </Text>
 
-          <Text style={styles.qty}>{item.quantity}</Text>
+          {/* Quantity Stepper */}
+          <View style={styles.qtyRow}>
+            <TouchableOpacity
+              onPress={() => updateQuantity(item.id, -1)}
+              style={styles.qtyBtn}
+            >
+              <Text style={styles.qtyText}>−</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => updateQuantity(item.id, 1)}
-            style={styles.qtyBtn}
-          >
-            <Text style={styles.qtyText}>+</Text>
-          </TouchableOpacity>
+            <Text style={styles.qty}>{item.quantity}</Text>
+
+            <TouchableOpacity
+              onPress={() => updateQuantity(item.id, 1)}
+              style={styles.qtyBtn}
+            >
+              <Text style={styles.qtyText}>+</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.subtotal}>
+            {formatDZD(parseFloat(item.total_price))}
+          </Text>
         </View>
 
-        <Text style={styles.subtotal}>
-          {formatDZD(item.price * item.quantity)}
-        </Text>
+        <TouchableOpacity onPress={() => removeItem(item.id)}>
+          <Text style={styles.remove}>✕</Text>
+        </TouchableOpacity>
       </View>
+    );
+  };
 
-      <TouchableOpacity onPress={() => removeItem(item.id)}>
-        <Text style={styles.remove}>✕</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  if (loading) {
+    return <ActivityIndicator style={{ marginTop: 50 }} size="large" />;
+  }
 
   if (cart.length === 0) {
     return (
@@ -117,7 +145,7 @@ export default function CartScreen() {
     <View style={{ flex: 1 }}>
       <FlatList
         data={cart}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
         contentContainerStyle={{ padding: 16 }}
       />

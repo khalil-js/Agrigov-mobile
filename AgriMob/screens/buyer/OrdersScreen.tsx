@@ -8,6 +8,8 @@ import {
   TextInput,
   ScrollView,
 } from "react-native";
+import { ActivityIndicator } from "react-native";
+import { orderApi } from "../../apis/order.api";
 import { Order } from "../../types/types";
 
 /* 🇩🇿 Algerian Currency Formatter */
@@ -16,31 +18,40 @@ const formatDZD = (value: number) => {
 };
 
 const OrdersScreen = () => {
-  const [orders] = useState<Order[]>([
-    {
-      id: 1,
-      order_id: "AG-8492",
-      supplier: "Sunnydale Farms",
-      product: "Wheat",
-      quantity: "500kg",
-      amount: 1250,
-      status: "Delivered",
-      date: "Oct 24",
-    },
-    {
-      id: 2,
-      order_id: "AG-8488",
-      supplier: "Fertilizer Co",
-      product: "NPK",
-      quantity: "20 sacks",
-      amount: 840,
-      status: "In Transit",
-      date: "Oct 20",
-    },
-  ]);
-
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(orders[0]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [search, setSearch] = useState("");
+
+  React.useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const response: any = await orderApi.myOrders();
+        // Handle paginated or direct array
+        const results = response.results ? response.results : response;
+        
+        const mapped = results.map((o: any) => ({
+          id: o.id,
+          order_id: `AG-${1000 + o.id}`,
+          supplier: o.farm || "Unknown Farm",
+          product: o.items?.[0]?.product?.title || "Multiple Items",
+          quantity: o.items?.[0]?.quantity ? `${o.items[0].quantity}x` : "N/A",
+          amount: parseFloat(o.total_price || 0),
+          status: o.status || "Pending",
+          date: new Date(o.created_at).toLocaleDateString(),
+        }));
+        
+        setOrders(mapped);
+        if (mapped.length > 0) setSelectedOrder(mapped[0]);
+      } catch (err) {
+        console.error("Failed to fetch orders:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
 
   const filtered = orders.filter(
     (o) =>
@@ -84,7 +95,9 @@ const OrdersScreen = () => {
       />
 
       {/* Orders List */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <ActivityIndicator size="large" style={{ marginTop: 50 }} />
+      ) : filtered.length === 0 ? (
         <View style={styles.empty}>
           <Text>No orders found</Text>
         </View>

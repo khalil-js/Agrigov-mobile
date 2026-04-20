@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
+import { profileApi } from "../apis/profile.api";
+import { ActivityIndicator } from "react-native";
 
 interface User {
   name: string;
@@ -22,6 +24,22 @@ interface User {
 
 const ProfileScreen = () => {
   const { user, logout } = useAuth();
+  const [profileData, setProfileData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const data = await profileApi.me();
+        setProfileData(data);
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -52,17 +70,35 @@ const ProfileScreen = () => {
 
           {/* STATS */}
           <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <MaterialIcons name="shopping-bag" size={22} color="#0df20d" />
-              <Text style={styles.statNumber}>12</Text>
-              <Text style={styles.statLabel}>Total Orders</Text>
-            </View>
+            {user?.role === "BUYER" && (
+              <View style={styles.statCard}>
+                <MaterialIcons name="shopping-bag" size={22} color="#0df20d" />
+                <Text style={styles.statNumber}>{profileData?.extras?.orders_count || 0}</Text>
+                <Text style={styles.statLabel}>Total Orders</Text>
+              </View>
+            )}
+
+            {user?.role === "FARMER" && (
+              <View style={styles.statCard}>
+                <MaterialIcons name="agriculture" size={22} color="#0df20d" />
+                <Text style={styles.statNumber}>{profileData?.extras?.farms_count || 0}</Text>
+                <Text style={styles.statLabel}>Registered Farms</Text>
+              </View>
+            )}
+
+            {user?.role === "TRANSPORTER" && (
+              <View style={styles.statCard}>
+                <MaterialIcons name="local-shipping" size={22} color="#0df20d" />
+                <Text style={styles.statNumber}>{profileData?.extras?.vehicles_count || 0}</Text>
+                <Text style={styles.statLabel}>Registered Vehicles</Text>
+              </View>
+            )}
 
             <View style={[styles.statCard, styles.activeCard]}>
-              <MaterialIcons name="local-shipping" size={22} color="#fff" />
-              <Text style={[styles.statNumber, { color: "#fff" }]}>2</Text>
+              <MaterialIcons name="verified" size={22} color="#fff" />
+              <Text style={[styles.statNumber, { color: "#fff" }]}>Active</Text>
               <Text style={[styles.statLabel, { color: "#fff" }]}>
-                Active Deliveries
+                Account Status
               </Text>
             </View>
           </View>
@@ -303,14 +339,3 @@ const styles = StyleSheet.create({
     color: "#777",
   },
 });
-
-/*import { useEffect, useState } from "react";
-import axios from "axios";
-
-const [user, setUser] = useState<User | null>(null);
-
-useEffect(() => {
-  axios.get("http://YOUR_IP:8000/api/user/profile/")
-    .then(res => setUser(res.data))
-    .catch(err => console.log(err));
-}, []);*/

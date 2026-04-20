@@ -10,6 +10,10 @@ import {
 } from "react-native";
 
 import { Product, Transporter } from "../../types/types";
+import { cartApi } from "../../apis/cart.api";
+import { orderApi } from "../../apis/order.api";
+import { useNavigation } from "@react-navigation/native";
+import { Alert, ActivityIndicator } from "react-native";
 
 /* 🇩🇿 Currency formatter */
 const formatDZD = (value: number) => {
@@ -17,17 +21,25 @@ const formatDZD = (value: number) => {
 };
 
 const CheckoutScreen = () => {
-  const [products] = useState<Product[]>([
-    {
-      id: 1,
-      name: "Premium Maize",
-      farmer_name: "Ali Farm",
-      price: 2500,
-      quantity: 100,
-      unit: "sacks",
-      image: "https://via.placeholder.com/100",
-    },
-  ]);
+  const navigation = useNavigation<any>();
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [subtotal, setSubtotal] = useState(0);
+
+  React.useEffect(() => {
+    const fetchCart = async () => {
+      try {
+        const res: any = await cartApi.get();
+        setProducts(res.items || []);
+        setSubtotal(parseFloat(res.total_price || 0));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCart();
+  }, []);
 
   const [transporters] = useState<Transporter[]>([
     {
@@ -56,14 +68,28 @@ const CheckoutScreen = () => {
     cvc: "",
     name: "",
   });
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   /* Calculations */
-  const subtotal = products.reduce(
-    (acc, item) => acc + item.price * item.quantity,
-    0
-  );
-
   const total = subtotal + selectedTransporter.price;
+
+  const handleCheckout = async () => {
+    setCheckoutLoading(true);
+    try {
+      await orderApi.checkout();
+      Alert.alert("Success", "Your order has been placed successfully!");
+      navigation.navigate("Orders");
+    } catch (err: any) {
+      console.error(err);
+      Alert.alert("Checkout Failed", err.message || "An error occurred");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <ActivityIndicator size="large" style={{ marginTop: 50 }} />;
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -141,22 +167,24 @@ const CheckoutScreen = () => {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Order Summary</Text>
 
-        {products.map((p) => (
+        {products.map((p) => {
+          const prod = p.product || {};
+          return (
           <View key={p.id} style={styles.productRow}>
-            <Image source={{ uri: p.image }} style={styles.image} />
+            <Image source={{ uri: prod.images?.[0]?.image || "https://via.placeholder.com/100" }} style={styles.image} />
 
             <View style={{ flex: 1 }}>
-              <Text style={styles.textBold}>{p.name}</Text>
+              <Text style={styles.textBold}>{prod.ministry_product?.name || "Unknown Product"}</Text>
               <Text style={styles.text}>
-                {p.quantity} {p.unit}
+                {p.quantity} kg
               </Text>
             </View>
 
             <Text style={styles.price}>
-              {formatDZD(p.price * p.quantity)}
+              {formatDZD(parseFloat(p.total_price))}
             </Text>
           </View>
-        ))}
+        )})}
 
         <View style={styles.divider} />
 
@@ -165,8 +193,8 @@ const CheckoutScreen = () => {
 
         <Row label="Total" value={formatDZD(total)} bold />
 
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Confirm Payment</Text>
+        <TouchableOpacity style={styles.button} onPress={handleCheckout} disabled={checkoutLoading}>
+          {checkoutLoading ? <ActivityIndicator color="#000" /> : <Text style={styles.buttonText}>Confirm Payment</Text>}
         </TouchableOpacity>
       </View>
     </ScrollView>
