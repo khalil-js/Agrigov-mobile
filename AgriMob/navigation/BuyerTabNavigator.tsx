@@ -14,7 +14,7 @@ import ProductDetailsScreen from "../screens/buyer/ProductDetailsScreen";
 import CartScreen from "../screens/buyer/CartScreen";
 import CheckoutScreen from "../screens/buyer/CheckoutScreen";
 import OrdersScreen from "../screens/buyer/OrdersScreen";
-import ProfileScreen from "../screens/profile/ProfileScreen";
+import ProfileStack from "./ProfileStack";
 
 export type MarketStackParamList = {
   ProductCatalog: undefined;
@@ -94,7 +94,7 @@ export default function BuyerTabNavigator() {
       <Tab.Screen name="Market" component={MarketStackNavigator} />
       <Tab.Screen name="Cart" component={CartScreen} />
       <Tab.Screen name="Orders" component={OrdersScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
   );
 }

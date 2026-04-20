@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { RouteProp } from "@react-navigation/native";
 
 import MissionManagementScreen from "../screens/transporter/MissionManagementScreen";
-import ProfileScreen from "../screens/profile/ProfileScreen";
+import ProfileStack from "./ProfileStack";
 
 export type TransporterTabParamList = {
   Missions: undefined;
@@ -49,7 +49,7 @@ export default function TransporterTabNavigator() {
       })}
     >
       <Tab.Screen name="Missions" component={MissionManagementScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
   );
 }

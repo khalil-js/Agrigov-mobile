@@ -96,6 +96,7 @@ CORS_ALLOWED_ORIGINS = [
         "http://192.168.1.100:3000",
         "http://192.168.1.12:8081",
         "http://192.168.1.12:3000",
+        "http://192.168.1.12:8000",  # ← Add this for Django API
     ]
 TEMPLATES = [
     {

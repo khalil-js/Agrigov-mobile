@@ -8,7 +8,7 @@ import FarmerDashboard from "../screens/farmer/FarmerDashboard";
 import InventoryScreen from "../screens/farmer/InventoryScreen";
 import AddProductScreen from "../screens/farmer/AddProductScreen";
 import LogisticsScreen from "../screens/farmer/LogisticsScreen";
-import ProfileScreen from "../screens/profile/ProfileScreen"; // Using the same profile screen
+import ProfileStack from "./ProfileStack"; // Using the same profile screen
 
 // Define types
 export type InventoryStackParamList = {
@@ -66,7 +66,7 @@ export default function FarmerTabNavigator() {
       <Tab.Screen name="Dashboard" component={FarmerDashboard} />
       <Tab.Screen name="Inventory" component={InventoryStackNavigator} />
       <Tab.Screen name="Logistics" component={LogisticsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
   );
 }
