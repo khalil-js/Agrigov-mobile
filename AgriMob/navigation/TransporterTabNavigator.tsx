@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { RouteProp } from "@react-navigation/native";
 
 import MissionManagementScreen from "../screens/transporter/MissionManagementScreen";
-import ProfileScreen from "../screens/ProfileScreen";
+import ProfileScreen from "../screens/profile/ProfileScreen";
 
 export type TransporterTabParamList = {
   Missions: undefined;
@@ -19,7 +19,10 @@ export default function TransporterTabNavigator() {
       screenOptions={({
         route,
       }: {
-        route: RouteProp<TransporterTabParamList, keyof TransporterTabParamList>;
+        route: RouteProp<
+          TransporterTabParamList,
+          keyof TransporterTabParamList
+        >;
       }) => ({
         tabBarIcon: ({
           focused,

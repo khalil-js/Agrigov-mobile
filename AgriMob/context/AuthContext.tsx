@@ -42,7 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       const res = await authApi.login(email, password);
+      console.log("[AUTH] Full login response:", JSON.stringify(res, null, 2));
       const { access, refresh, user: userData } = res.data;
+      console.log("[AUTH] User role from backend:", userData?.role);
+      console.log("[AUTH] User data:", JSON.stringify(userData, null, 2));
 
       // Save everything so api.ts can read the token on future requests
       await Promise.all([
@@ -53,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(userData);
       return { success: true };
     } catch (err: any) {
+      console.log("[AUTH] Login error:", err.message, err);
       return { success: false, error: err.message || "Login failed." };
     }
   };

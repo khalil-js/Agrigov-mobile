@@ -8,7 +8,7 @@ import FarmerDashboard from "../screens/farmer/FarmerDashboard";
 import InventoryScreen from "../screens/farmer/InventoryScreen";
 import AddProductScreen from "../screens/farmer/AddProductScreen";
 import LogisticsScreen from "../screens/farmer/LogisticsScreen";
-import ProfileScreen from "../screens/ProfileScreen"; // Using the same profile screen
+import ProfileScreen from "../screens/profile/ProfileScreen"; // Using the same profile screen
 
 // Define types
 export type InventoryStackParamList = {

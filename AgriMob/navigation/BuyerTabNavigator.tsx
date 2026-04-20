@@ -14,7 +14,7 @@ import ProductDetailsScreen from "../screens/buyer/ProductDetailsScreen";
 import CartScreen from "../screens/buyer/CartScreen";
 import CheckoutScreen from "../screens/buyer/CheckoutScreen";
 import OrdersScreen from "../screens/buyer/OrdersScreen";
-import ProfileScreen from "../screens/ProfileScreen";
+import ProfileScreen from "../screens/profile/ProfileScreen";
 
 export type MarketStackParamList = {
   ProductCatalog: undefined;
