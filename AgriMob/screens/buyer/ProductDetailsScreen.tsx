@@ -8,6 +8,8 @@ import {
   StyleSheet,
   TextInput,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MarketStackParamList } from "../../navigation/BuyerTabNavigator";
@@ -15,10 +17,8 @@ import { productApi } from "../../apis/product.api";
 import { cartApi } from "../../apis/cart.api";
 import { Alert, ActivityIndicator } from "react-native";
 
-/* 🇩🇿 Currency formatter */
-const formatDZD = (value: number) => {
-  return value.toFixed(2) + " DZD";
-};
+const formatDZD = (value: number) =>
+  new Intl.NumberFormat("fr-DZ").format(value) + " DZD";
 
 interface Product {
   id: string;
@@ -34,198 +34,314 @@ interface Product {
     name: string;
     rating: number;
     location: string;
-    avatar: string;
   };
 }
 
-const ProductDetailsScreen = () => {
+export default function ProductDetailsScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<MarketStackParamList>>();
-
   const route = useRoute();
   const { productId } = route.params as { productId: string };
 
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [quantity, setQuantity] = useState("10");
-  const [activeTab, setActiveTab] = useState("specs");
+  const [activeTab, setActiveTab] = useState<"specs" | "details">("specs");
   const [addingToCart, setAddingToCart] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const fetchProduct = async () => {
-    try {
-      const data: any = await productApi.detail(productId);
-      
-      const mappedProduct: Product = {
-        id: data.id.toString(),
-        name: data.ministry_product?.name || "Unknown Product",
-        description: data.description,
-        price: parseFloat(data.unit_price) || 0,
-        unit: "kg",
-        images: data.images?.length > 0 
-          ? data.images.map((img: any) => img.image)
-          : ["https://via.placeholder.com/400"],
-        location: data.farm?.wilaya || "Unknown Location",
-        grade: "A", // Default grade
-        specifications: {
-          Category: data.category_name || "N/A",
-          Season: data.season || "N/A",
-          Stock: `${data.stock} available`,
-        },
-        farmer: {
-          name: data.farmer_name || "Unknown Farmer",
-          rating: data.average_rating || 5.0,
-          location: data.farm?.wilaya || "Unknown",
-          avatar: "https://via.placeholder.com/100", // Add avatar logic if backend provides it
-        },
-      };
-
-      setProduct(mappedProduct);
-      setSelectedImage(mappedProduct.images[0]);
-    } catch (err) {
-      console.log(err);
-      Alert.alert("Error", "Could not fetch product details.");
-    }
-  };
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        const data: any = await productApi.detail(productId);
+        const mapped: Product = {
+          id: data.id.toString(),
+          name: data.ministry_product?.name || "Unknown Product",
+          description: data.description,
+          price: parseFloat(data.unit_price) || 0,
+          unit: "kg",
+          images:
+            data.images?.length > 0
+              ? data.images.map((img: any) => img.image)
+              : ["https://via.placeholder.com/400"],
+          location: data.farm?.wilaya || "Unknown Location",
+          grade: "A",
+          specifications: {
+            Category: data.category_name || "N/A",
+            Season: data.season || "N/A",
+            Stock: `${data.stock} kg available`,
+            Farm: data.farm?.name || "N/A",
+          },
+          farmer: {
+            name: data.farmer_name || "Unknown Farmer",
+            rating: data.average_rating || 5.0,
+            location: data.farm?.wilaya || "Unknown",
+          },
+        };
+        setProduct(mapped);
+        setSelectedImage(mapped.images[0]);
+      } catch (err) {
+        Alert.alert("Error", "Could not fetch product details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProduct();
+  }, []);
 
   const handleAddToCart = async () => {
     if (!product) return;
-    
     setAddingToCart(true);
     try {
       await cartApi.add(Number(product.id), Number(quantity));
-      Alert.alert("Success", "Product added to cart!");
+      Alert.alert("Added to Cart", `${product.name} added successfully.`);
       navigation.getParent()?.navigate("Cart");
     } catch (error) {
-      console.error(error);
       Alert.alert("Error", "Failed to add product to cart.");
     } finally {
       setAddingToCart(false);
     }
   };
 
-  useEffect(() => {
-    fetchProduct();
-  }, []);
+  if (loading || !product) {
+    return (
+      <SafeAreaView style={styles.loadingContainer} edges={["top"]}>
+        <ActivityIndicator size="large" color="#0df20d" />
+      </SafeAreaView>
+    );
+  }
 
-  if (!product) return <Text style={{ marginTop: 50 }}>Loading...</Text>;
+  const totalPrice = product.price * (parseInt(quantity) || 0);
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Product Gallery */}
-      <Image source={{ uri: selectedImage }} style={styles.mainImage} />
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {product.images.map((img, index) => (
-          <TouchableOpacity key={index} onPress={() => setSelectedImage(img)}>
-            <Image
-              source={{ uri: img }}
-              style={[
-                styles.thumbnail,
-                selectedImage === img && styles.activeThumb,
-              ]}
-            />
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Product Info */}
-      <View style={styles.section}>
-        <Text style={styles.title}>{product.name}</Text>
-
-        <Text style={styles.price}>
-          {formatDZD(product.price)} / {product.unit}
-        </Text>
-
-        <Text style={styles.location}>📍 {product.location}</Text>
-
-        <Text style={styles.grade}>Grade: {product.grade}</Text>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialIcons name="arrow-back" size={20} color="#1a2e1a" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Product Details</Text>
+        <View style={{ width: 36 }} />
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabs}>
-        <TouchableOpacity onPress={() => setActiveTab("specs")}>
-          <Text style={[styles.tab, activeTab === "specs" && styles.activeTab]}>
-            Specifications
-          </Text>
-        </TouchableOpacity>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Main Image */}
+        <Image source={{ uri: selectedImage }} style={styles.mainImage} />
 
-        <TouchableOpacity onPress={() => setActiveTab("details")}>
-          <Text
-            style={[styles.tab, activeTab === "details" && styles.activeTab]}
+        {/* Thumbnail strip */}
+        {product.images.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbStrip}
           >
-            Details
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Tab Content */}
-      <View style={styles.section}>
-        {activeTab === "specs" &&
-          Object.entries(product.specifications).map(([key, value]) => (
-            <View key={key} style={styles.specRow}>
-              <Text style={styles.specKey}>{key}</Text>
-              <Text style={styles.specValue}>{value}</Text>
-            </View>
-          ))}
-
-        {activeTab === "details" && (
-          <Text style={styles.description}>{product.description}</Text>
+            {product.images.map((img, i) => (
+              <TouchableOpacity key={i} onPress={() => setSelectedImage(img)}>
+                <Image
+                  source={{ uri: img }}
+                  style={[
+                    styles.thumb,
+                    selectedImage === img && styles.thumbActive,
+                  ]}
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         )}
-      </View>
 
-      {/* Farmer Info */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Farmer</Text>
+        {/* Product Info */}
+        <View style={styles.section}>
+          <View style={styles.productHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.productName}>{product.name}</Text>
+              <View style={styles.locationRow}>
+                <MaterialIcons name="place" size={13} color="#6b7280" />
+                <Text style={styles.locationText}>{product.location}</Text>
+              </View>
+            </View>
+            <View style={styles.gradePill}>
+              <Text style={styles.gradeText}>Grade {product.grade}</Text>
+            </View>
+          </View>
 
-        <View style={styles.farmerRow}>
-          <Image
-            source={{ uri: product.farmer.avatar }}
-            style={styles.avatar}
-          />
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formatDZD(product.price)}</Text>
+            <Text style={styles.priceUnit}>/ {product.unit}</Text>
+          </View>
 
-          <View>
-            <Text style={styles.farmerName}>{product.farmer.name}</Text>
-            <Text style={styles.farmerInfo}>
-              📍 {product.farmer.location}
-            </Text>
-            <Text style={styles.farmerInfo}>
-              ⭐ {product.farmer.rating}
-            </Text>
+          {/* Meta pills */}
+          <View style={styles.metaPills}>
+            <View style={styles.metaPill}>
+              <MaterialIcons name="eco" size={12} color="#047857" />
+              <Text style={styles.metaPillText}>Fresh Harvest</Text>
+            </View>
+            <View style={styles.metaPill}>
+              <MaterialIcons name="verified" size={12} color="#047857" />
+              <Text style={styles.metaPillText}>Certified</Text>
+            </View>
+            <View style={styles.metaPill}>
+              <MaterialIcons name="local-shipping" size={12} color="#6b7280" />
+              <Text style={[styles.metaPillText, { color: "#6b7280" }]}>
+                Ships in 24h
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* Order Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Order</Text>
+        {/* Tabs */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "specs" && styles.tabActive]}
+            onPress={() => setActiveTab("specs")}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "specs" && styles.tabTextActive,
+              ]}
+            >
+              Specifications
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "details" && styles.tabActive]}
+            onPress={() => setActiveTab("details")}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "details" && styles.tabTextActive,
+              ]}
+            >
+              Details
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-        <TextInput
-          value={quantity}
-          onChangeText={setQuantity}
-          keyboardType="numeric"
-          style={styles.input}
-        />
+        <View style={styles.section}>
+          {activeTab === "specs" &&
+            Object.entries(product.specifications).map(([key, value]) => (
+              <View key={key} style={styles.specRow}>
+                <Text style={styles.specKey}>{key}</Text>
+                <Text style={styles.specValue}>{value}</Text>
+              </View>
+            ))}
+          {activeTab === "details" && (
+            <Text style={styles.descText}>{product.description}</Text>
+          )}
+        </View>
 
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={() => navigation.navigate("Checkout")}
-        >
-          <Text style={styles.btnText}>Buy Now</Text>
-        </TouchableOpacity>
+        {/* Farmer Card */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Farmer</Text>
+          <View style={styles.farmerCard}>
+            <View style={styles.farmerAvatar}>
+              <MaterialIcons name="person" size={20} color="#047857" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.farmerName}>{product.farmer.name}</Text>
+              <View style={styles.farmerMeta}>
+                <MaterialIcons name="place" size={11} color="#9ca3af" />
+                <Text style={styles.farmerMetaText}>
+                  {product.farmer.location}
+                </Text>
+                <MaterialIcons name="star" size={11} color="#f59e0b" />
+                <Text style={styles.farmerMetaText}>
+                  {product.farmer.rating.toFixed(1)}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.verifiedBadge}>
+              <MaterialIcons name="verified" size={12} color="#047857" />
+              <Text style={styles.verifiedText}>Verified</Text>
+            </View>
+          </View>
+        </View>
 
-        <TouchableOpacity
-          style={styles.secondaryBtn}
-          onPress={handleAddToCart}
-          disabled={addingToCart}
-        >
-          {addingToCart ? <ActivityIndicator color="#000" /> : <Text>Add to Cart</Text>}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+        {/* Order Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Place Order</Text>
+
+          <View style={styles.qtySection}>
+            <Text style={styles.qtyLabel}>Quantity (kg)</Text>
+            <View style={styles.qtyStepper}>
+              <TouchableOpacity
+                style={styles.qtyBtn}
+                onPress={() =>
+                  setQuantity((prev) =>
+                    String(Math.max(1, parseInt(prev) - 1))
+                  )
+                }
+              >
+                <MaterialIcons name="remove" size={16} color="#047857" />
+              </TouchableOpacity>
+              <TextInput
+                value={quantity}
+                onChangeText={(v) => setQuantity(v.replace(/[^0-9]/g, ""))}
+                keyboardType="numeric"
+                style={styles.qtyInput}
+              />
+              <TouchableOpacity
+                style={styles.qtyBtn}
+                onPress={() =>
+                  setQuantity((prev) => String(parseInt(prev) + 1))
+                }
+              >
+                <MaterialIcons name="add" size={16} color="#047857" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Price breakdown */}
+          <View style={styles.priceBreakdown}>
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>Unit price</Text>
+              <Text style={styles.breakdownVal}>{formatDZD(product.price)}</Text>
+            </View>
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>Quantity</Text>
+              <Text style={styles.breakdownVal}>{quantity} kg</Text>
+            </View>
+            <View style={[styles.breakdownRow, styles.breakdownTotal]}>
+              <Text style={styles.breakdownTotalLabel}>Total</Text>
+              <Text style={styles.breakdownTotalVal}>
+                {formatDZD(totalPrice)}
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.buyNowBtn}
+            onPress={() => navigation.navigate("Checkout")}
+          >
+            <Text style={styles.buyNowText}>Buy Now</Text>
+            <MaterialIcons name="arrow-forward" size={16} color="#065f46" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.addCartBtn}
+            onPress={handleAddToCart}
+            disabled={addingToCart}
+          >
+            {addingToCart ? (
+              <ActivityIndicator color="#047857" size="small" />
+            ) : (
+              <>
+                <MaterialIcons name="shopping-cart" size={16} color="#047857" />
+                <Text style={styles.addCartText}>Add to Cart</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ height: 24 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
-};
-
-export default ProductDetailsScreen;
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -233,135 +349,409 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f8f5",
   },
 
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f5f8f5",
+  },
+
+  // ── HEADER
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#f0f0f0",
+  },
+
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#f8faf8",
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1a2e1a",
+    letterSpacing: -0.2,
+  },
+
+  // ── IMAGES
   mainImage: {
     width: "100%",
-    height: 250,
+    height: 240,
   },
 
-  thumbnail: {
-    width: 70,
-    height: 70,
-    margin: 5,
-    borderRadius: 8,
+  thumbStrip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
   },
 
-  activeThumb: {
-    borderWidth: 2,
+  thumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+
+  thumbActive: {
     borderColor: "#0df20d",
   },
 
+  // ── SECTIONS
   section: {
-    padding: 15,
     backgroundColor: "#fff",
-    marginTop: 10,
-  },
-
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-
-  price: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginVertical: 5,
-  },
-
-  location: {
-    color: "#555",
-  },
-
-  grade: {
-    color: "#0df20d",
-    fontWeight: "600",
-  },
-
-  tabs: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    backgroundColor: "#fff",
-    marginTop: 10,
-  },
-
-  tab: {
-    padding: 10,
-    color: "#888",
-  },
-
-  activeTab: {
-    color: "#0df20d",
-    fontWeight: "bold",
-  },
-
-  specRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 6,
-  },
-
-  specKey: {
-    color: "#666",
-  },
-
-  specValue: {
-    fontWeight: "600",
-  },
-
-  description: {
-    color: "#555",
+    marginTop: 8,
+    padding: 16,
+    borderTopWidth: 0.5,
+    borderBottomWidth: 0.5,
+    borderColor: "#f0f0f0",
   },
 
   sectionTitle: {
-    fontWeight: "bold",
-    marginBottom: 10,
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#1a2e1a",
+    letterSpacing: -0.1,
+    marginBottom: 12,
   },
 
-  farmerRow: {
+  // ── PRODUCT INFO
+  productHeader: {
     flexDirection: "row",
+    alignItems: "flex-start",
     gap: 10,
-    alignItems: "center",
-  },
-
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-
-  farmerName: {
-    fontWeight: "bold",
-  },
-
-  farmerInfo: {
-    fontSize: 12,
-    color: "#555",
-  },
-
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-
-  primaryBtn: {
-    backgroundColor: "#0df20d",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
     marginBottom: 8,
   },
 
-  secondaryBtn: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
+  productName: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1a2e1a",
+    letterSpacing: -0.4,
+    marginBottom: 4,
   },
 
-  btnText: {
-    fontWeight: "bold",
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+
+  locationText: {
+    fontSize: 12,
+    color: "#6b7280",
+    fontWeight: "600",
+  },
+
+  gradePill: {
+    backgroundColor: "#d1fae5",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+
+  gradeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#047857",
+  },
+
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 4,
+    marginBottom: 12,
+  },
+
+  price: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#1a2e1a",
+    letterSpacing: -0.5,
+  },
+
+  priceUnit: {
+    fontSize: 13,
+    color: "#9ca3af",
+    fontWeight: "600",
+  },
+
+  metaPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+
+  metaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#f8faf8",
+    borderRadius: 20,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+  },
+
+  metaPillText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#047857",
+  },
+
+  // ── TABS
+  tabsContainer: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderTopWidth: 0.5,
+    borderBottomWidth: 0.5,
+    borderColor: "#f0f0f0",
+    marginTop: 8,
+  },
+
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+
+  tabActive: {
+    borderBottomColor: "#0df20d",
+  },
+
+  tabText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#9ca3af",
+  },
+
+  tabTextActive: {
+    color: "#047857",
+  },
+
+  // ── SPECS
+  specRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#f3f4f6",
+  },
+
+  specKey: {
+    fontSize: 13,
+    color: "#9ca3af",
+    fontWeight: "600",
+  },
+
+  specValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#374151",
+  },
+
+  descText: {
+    fontSize: 13,
+    color: "#6b7280",
+    lineHeight: 20,
+  },
+
+  // ── FARMER
+  farmerCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#f8faf8",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+  },
+
+  farmerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#d1fae5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  farmerName: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#1a2e1a",
+    marginBottom: 4,
+  },
+
+  farmerMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  farmerMetaText: {
+    fontSize: 11,
+    color: "#9ca3af",
+    fontWeight: "600",
+    marginRight: 6,
+  },
+
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#d1fae5",
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+
+  verifiedText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#047857",
+  },
+
+  // ── ORDER SECTION
+  qtySection: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+
+  qtyLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#374151",
+  },
+
+  qtyStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#f8faf8",
+    borderRadius: 12,
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+
+  qtyBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: "#d1fae5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  qtyInput: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1a2e1a",
+    minWidth: 40,
+    textAlign: "center",
+    padding: 0,
+  },
+
+  priceBreakdown: {
+    backgroundColor: "#f8faf8",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+    marginBottom: 14,
+  },
+
+  breakdownRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+  },
+
+  breakdownLabel: {
+    fontSize: 12,
+    color: "#9ca3af",
+    fontWeight: "600",
+  },
+
+  breakdownVal: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#374151",
+  },
+
+  breakdownTotal: {
+    borderTopWidth: 0.5,
+    borderTopColor: "#e4efe4",
+    marginTop: 4,
+    paddingTop: 8,
+  },
+
+  breakdownTotalLabel: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#1a2e1a",
+  },
+
+  breakdownTotalVal: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#047857",
+    letterSpacing: -0.3,
+  },
+
+  buyNowBtn: {
+    backgroundColor: "#0df20d",
+    borderRadius: 12,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginBottom: 10,
+  },
+
+  buyNowText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#065f46",
+  },
+
+  addCartBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#d1fae5",
+    borderRadius: 12,
+    paddingVertical: 13,
+    backgroundColor: "#f0fdf4",
+  },
+
+  addCartText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#047857",
   },
 });

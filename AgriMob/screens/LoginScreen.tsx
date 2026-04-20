@@ -213,7 +213,7 @@ export default function LoginScreen() {
             <ActivityIndicator color="#000" />
           ) : (
             <Text style={{ fontWeight: "bold", color: "#000" }}>
-              Secure Sign In
+              Sign In
             </Text>
           )}
         </TouchableOpacity>

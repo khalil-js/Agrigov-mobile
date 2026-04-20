@@ -7,24 +7,60 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
-
-import { Product, Transporter } from "../../types/types";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { MaterialIcons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { cartApi } from "../../apis/cart.api";
 import { orderApi } from "../../apis/order.api";
-import { useNavigation } from "@react-navigation/native";
-import { Alert, ActivityIndicator } from "react-native";
 
-/* 🇩🇿 Currency formatter */
-const formatDZD = (value: number) => {
-  return value.toFixed(2) + " DZD";
-};
+const formatDZD = (value: number) =>
+  new Intl.NumberFormat("fr-DZ").format(Math.round(value)) + " DZD";
 
-const CheckoutScreen = () => {
+interface Transporter {
+  id: number;
+  name: string;
+  rating: number;
+  price: number;
+  delivery_time: string;
+  badge?: string;
+}
+
+const TRANSPORTERS: Transporter[] = [
+  {
+    id: 1,
+    name: "Agro Logistics",
+    rating: 4.8,
+    price: 120,
+    delivery_time: "2 Days",
+    badge: "Fastest",
+  },
+  {
+    id: 2,
+    name: "Farm Express",
+    rating: 4.5,
+    price: 90,
+    delivery_time: "4 Days",
+  },
+];
+
+export default function CheckoutScreen() {
   const navigation = useNavigation<any>();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [subtotal, setSubtotal] = useState(0);
+  const [selectedTransporter, setSelectedTransporter] = useState<Transporter>(
+    TRANSPORTERS[0]
+  );
+  const [card, setCard] = useState({
+    number: "",
+    expiry: "",
+    cvc: "",
+    name: "",
+  });
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   React.useEffect(() => {
     const fetchCart = async () => {
@@ -41,46 +77,17 @@ const CheckoutScreen = () => {
     fetchCart();
   }, []);
 
-  const [transporters] = useState<Transporter[]>([
-    {
-      id: 1,
-      name: "Agro Logistics",
-      rating: 4.8,
-      price: 120,
-      delivery_time: "2 Days",
-    },
-    {
-      id: 2,
-      name: "Farm Express",
-      rating: 4.5,
-      price: 90,
-      delivery_time: "4 Days",
-    },
-  ]);
-
-  const [selectedTransporter, setSelectedTransporter] = useState<Transporter>(
-    transporters[0]
-  );
-
-  const [card, setCard] = useState({
-    number: "",
-    expiry: "",
-    cvc: "",
-    name: "",
-  });
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
-
-  /* Calculations */
-  const total = subtotal + selectedTransporter.price;
+  const levy = subtotal * 0.01;
+  const total = subtotal + selectedTransporter.price + levy;
 
   const handleCheckout = async () => {
     setCheckoutLoading(true);
     try {
       await orderApi.checkout();
-      Alert.alert("Success", "Your order has been placed successfully!");
-      navigation.navigate("Orders");
+      Alert.alert("Order Placed!", "Your order has been placed successfully.", [
+        { text: "View Orders", onPress: () => navigation.navigate("Orders") },
+      ]);
     } catch (err: any) {
-      console.error(err);
       Alert.alert("Checkout Failed", err.message || "An error occurred");
     } finally {
       setCheckoutLoading(false);
@@ -88,223 +95,627 @@ const CheckoutScreen = () => {
   };
 
   if (loading) {
-    return <ActivityIndicator size="large" style={{ marginTop: 50 }} />;
+    return (
+      <SafeAreaView style={styles.loadingContainer} edges={["top"]}>
+        <ActivityIndicator size="large" color="#0df20d" />
+      </SafeAreaView>
+    );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Checkout</Text>
-
-      {/* Delivery Address */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Delivery Address</Text>
-        <Text style={styles.textBold}>Farm Warehouse</Text>
-        <Text style={styles.text}>Jijel, Algeria</Text>
-        <Text style={styles.text}>+213 XXX XXX</Text>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialIcons name="arrow-back" size={20} color="#1a2e1a" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Checkout</Text>
+        <View style={{ width: 36 }} />
       </View>
 
-      {/* Transporters */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Select Transporter</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Step indicator */}
+        <View style={styles.stepRow}>
+          {["Address", "Transport", "Payment", "Confirm"].map((step, i) => (
+            <React.Fragment key={step}>
+              <View style={styles.stepItem}>
+                <View style={[styles.stepDot, i <= 2 && styles.stepDotActive]}>
+                  {i < 2 ? (
+                    <MaterialIcons name="check" size={10} color="#065f46" />
+                  ) : (
+                    <Text style={styles.stepDotNum}>{i + 1}</Text>
+                  )}
+                </View>
+                <Text style={[styles.stepLabel, i <= 2 && styles.stepLabelActive]}>
+                  {step}
+                </Text>
+              </View>
+              {i < 3 && (
+                <View style={[styles.stepLine, i < 2 && styles.stepLineDone]} />
+              )}
+            </React.Fragment>
+          ))}
+        </View>
 
-        {transporters.map((t) => (
-          <TouchableOpacity
-            key={t.id}
-            style={[
-              styles.transporter,
-              selectedTransporter.id === t.id && styles.selected,
-            ]}
-            onPress={() => setSelectedTransporter(t)}
-          >
-            <View>
-              <Text style={styles.textBold}>{t.name}</Text>
-              <Text style={styles.text}>
-                ⭐ {t.rating} • {t.delivery_time}
-              </Text>
+        {/* Delivery Address */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIconBox}>
+              <MaterialIcons name="place" size={16} color="#047857" />
             </View>
+            <Text style={styles.cardTitle}>Delivery Address</Text>
+            <TouchableOpacity style={styles.editBtn}>
+              <Text style={styles.editBtnText}>Edit</Text>
+            </TouchableOpacity>
+          </View>
 
-            <Text style={styles.price}>{formatDZD(t.price)}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          <View style={styles.addressBody}>
+            <Text style={styles.addressName}>Farm Warehouse</Text>
+            <Text style={styles.addressSub}>Jijel, Algeria</Text>
+            <Text style={styles.addressSub}>+213 XXX XXX</Text>
+          </View>
+        </View>
 
-      {/* Payment */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Payment Method</Text>
+        {/* Select Transporter */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIconBox}>
+              <MaterialIcons name="local-shipping" size={16} color="#047857" />
+            </View>
+            <Text style={styles.cardTitle}>Select Transporter</Text>
+          </View>
 
-        <TextInput
-          placeholder="Card Number"
-          style={styles.input}
-          value={card.number}
-          onChangeText={(v) => setCard({ ...card, number: v })}
-        />
+          {TRANSPORTERS.map((t) => (
+            <TouchableOpacity
+              key={t.id}
+              style={[
+                styles.transporterOpt,
+                selectedTransporter.id === t.id && styles.transporterOptActive,
+              ]}
+              onPress={() => setSelectedTransporter(t)}
+            >
+              <View style={styles.transporterLeft}>
+                <View style={styles.transporterAvatar}>
+                  <MaterialIcons name="directions-car" size={16} color="#047857" />
+                </View>
+                <View>
+                  <View style={styles.transporterNameRow}>
+                    <Text style={styles.transporterName}>{t.name}</Text>
+                    {t.badge && (
+                      <View style={styles.transporterBadge}>
+                        <Text style={styles.transporterBadgeText}>
+                          {t.badge}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.transporterMeta}>
+                    <MaterialIcons name="star" size={11} color="#f59e0b" />
+                    <Text style={styles.transporterMetaText}>{t.rating}</Text>
+                    <Text style={styles.metaDot}>·</Text>
+                    <MaterialIcons name="schedule" size={11} color="#9ca3af" />
+                    <Text style={styles.transporterMetaText}>
+                      {t.delivery_time}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.transporterPriceCol}>
+                <Text style={styles.transporterPrice}>{formatDZD(t.price)}</Text>
+                {selectedTransporter.id === t.id && (
+                  <MaterialIcons name="check-circle" size={16} color="#0df20d" />
+                )}
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        <View style={{ flexDirection: "row", gap: 10 }}>
+        {/* Payment Method */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIconBox}>
+              <MaterialIcons name="credit-card" size={16} color="#047857" />
+            </View>
+            <Text style={styles.cardTitle}>Payment Method</Text>
+          </View>
+
           <TextInput
-            placeholder="MM/YY"
-            style={[styles.input, { flex: 1 }]}
-            value={card.expiry}
-            onChangeText={(v) => setCard({ ...card, expiry: v })}
+            placeholder="Card number"
+            placeholderTextColor="#c0cfc0"
+            style={styles.input}
+            value={card.number}
+            onChangeText={(v) => setCard({ ...card, number: v })}
+            keyboardType="number-pad"
           />
 
+          <View style={styles.inputRow}>
+            <TextInput
+              placeholder="MM/YY"
+              placeholderTextColor="#c0cfc0"
+              style={[styles.input, styles.inputHalf]}
+              value={card.expiry}
+              onChangeText={(v) => setCard({ ...card, expiry: v })}
+            />
+            <TextInput
+              placeholder="CVC"
+              placeholderTextColor="#c0cfc0"
+              style={[styles.input, styles.inputHalf]}
+              value={card.cvc}
+              onChangeText={(v) => setCard({ ...card, cvc: v })}
+              keyboardType="number-pad"
+            />
+          </View>
+
           <TextInput
-            placeholder="CVC"
-            style={[styles.input, { flex: 1 }]}
-            value={card.cvc}
-            onChangeText={(v) => setCard({ ...card, cvc: v })}
+            placeholder="Name on card"
+            placeholderTextColor="#c0cfc0"
+            style={styles.input}
+            value={card.name}
+            onChangeText={(v) => setCard({ ...card, name: v })}
           />
         </View>
 
-        <TextInput
-          placeholder="Name on Card"
-          style={styles.input}
-          value={card.name}
-          onChangeText={(v) => setCard({ ...card, name: v })}
-        />
-      </View>
-
-      {/* Order Summary */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Order Summary</Text>
-
-        {products.map((p) => {
-          const prod = p.product || {};
-          return (
-          <View key={p.id} style={styles.productRow}>
-            <Image source={{ uri: prod.images?.[0]?.image || "https://via.placeholder.com/100" }} style={styles.image} />
-
-            <View style={{ flex: 1 }}>
-              <Text style={styles.textBold}>{prod.ministry_product?.name || "Unknown Product"}</Text>
-              <Text style={styles.text}>
-                {p.quantity} kg
-              </Text>
+        {/* Order Summary */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIconBox}>
+              <MaterialIcons name="receipt-long" size={16} color="#047857" />
             </View>
-
-            <Text style={styles.price}>
-              {formatDZD(parseFloat(p.total_price))}
-            </Text>
+            <Text style={styles.cardTitle}>Order Summary</Text>
           </View>
-        )})}
 
-        <View style={styles.divider} />
+          {products.map((p) => {
+            const prod = p.product || {};
+            return (
+              <View key={p.id} style={styles.orderItem}>
+                <Image
+                  source={{
+                    uri:
+                      prod.images?.[0]?.image ||
+                      "https://via.placeholder.com/100",
+                  }}
+                  style={styles.orderItemImage}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.orderItemName} numberOfLines={1}>
+                    {prod.ministry_product?.name || "Unknown Product"}
+                  </Text>
+                  <Text style={styles.orderItemQty}>{p.quantity} kg</Text>
+                </View>
+                <Text style={styles.orderItemPrice}>
+                  {formatDZD(parseFloat(p.total_price))}
+                </Text>
+              </View>
+            );
+          })}
 
-        <Row label="Subtotal" value={formatDZD(subtotal)} />
-        <Row label="Transport" value={formatDZD(selectedTransporter.price)} />
+          <View style={styles.divider} />
 
-        <Row label="Total" value={formatDZD(total)} bold />
+          <Row label="Subtotal" value={formatDZD(subtotal)} />
+          <Row
+            label={`Transport (${selectedTransporter.name})`}
+            value={formatDZD(selectedTransporter.price)}
+          />
+          <Row label="Platform levy (1%)" value={formatDZD(levy)} />
 
-        <TouchableOpacity style={styles.button} onPress={handleCheckout} disabled={checkoutLoading}>
-          {checkoutLoading ? <ActivityIndicator color="#000" /> : <Text style={styles.buttonText}>Confirm Payment</Text>}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          <View style={styles.divider} />
+
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalVal}>{formatDZD(total)}</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.confirmBtn}
+            onPress={handleCheckout}
+            disabled={checkoutLoading}
+          >
+            {checkoutLoading ? (
+              <ActivityIndicator color="#065f46" />
+            ) : (
+              <>
+                <MaterialIcons name="lock" size={16} color="#065f46" />
+                <Text style={styles.confirmBtnText}>Confirm Payment</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ height: 20 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
-};
+}
 
-const Row = ({ label, value, bold = false }: any) => (
-  <View style={styles.row}>
-    <Text style={bold ? styles.textBold : styles.text}>{label}</Text>
-    <Text style={bold ? styles.textBold : styles.text}>{value}</Text>
+const Row = ({ label, value }: { label: string; value: string }) => (
+  <View style={styles.summaryRow}>
+    <Text style={styles.summaryLabel}>{label}</Text>
+    <Text style={styles.summaryVal}>{value}</Text>
   </View>
 );
-
-export default CheckoutScreen;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f8f5",
-    padding: 16,
   },
 
-  title: {
-    fontSize: 26,
-    fontWeight: "bold",
-    marginBottom: 20,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f5f8f5",
   },
 
-  card: {
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
+  scrollContent: {
+    padding: 14,
   },
 
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-
-  text: {
-    color: "#555",
-  },
-
-  textBold: {
-    fontWeight: "bold",
-  },
-
-  transporter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-
-  selected: {
-    borderColor: "#0df20d",
-    backgroundColor: "#eaffea",
-  },
-
-  price: {
-    fontWeight: "bold",
-  },
-
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 10,
-  },
-
-  productRow: {
+  // ── HEADER
+  header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#f0f0f0",
+  },
+
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#f8faf8",
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1a2e1a",
+    letterSpacing: -0.2,
+  },
+
+  // ── STEP INDICATOR
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+  },
+
+  stepItem: {
+    alignItems: "center",
+    gap: 4,
+  },
+
+  stepDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#f3f4f6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  stepDotActive: {
+    backgroundColor: "#d1fae5",
+  },
+
+  stepDotNum: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#9ca3af",
+  },
+
+  stepLabel: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#c4c4c4",
+    letterSpacing: 0.2,
+  },
+
+  stepLabelActive: {
+    color: "#047857",
+  },
+
+  stepLine: {
+    flex: 1,
+    height: 1.5,
+    backgroundColor: "#e5e7eb",
+    marginHorizontal: 4,
+    marginBottom: 14,
+  },
+
+  stepLineDone: {
+    backgroundColor: "#0df20d",
+  },
+
+  // ── CARDS
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+  },
+
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 14,
+  },
+
+  cardIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: "#d1fae5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#1a2e1a",
+    flex: 1,
+    letterSpacing: -0.2,
+  },
+
+  editBtn: {
+    backgroundColor: "#f8faf8",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+  },
+
+  editBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#047857",
+  },
+
+  // ── ADDRESS
+  addressBody: {
+    backgroundColor: "#f8faf8",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+  },
+
+  addressName: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#1a2e1a",
+    marginBottom: 3,
+  },
+
+  addressSub: {
+    fontSize: 12,
+    color: "#9ca3af",
+    fontWeight: "600",
+    marginTop: 1,
+  },
+
+  // ── TRANSPORTER
+  transporterOpt: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+
+  transporterOptActive: {
+    borderWidth: 1.5,
+    borderColor: "#0df20d",
+    backgroundColor: "#f0fdf4",
+  },
+
+  transporterLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  transporterAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#d1fae5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  transporterNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 3,
+  },
+
+  transporterName: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#1a2e1a",
+  },
+
+  transporterBadge: {
+    backgroundColor: "#fef3c7",
+    borderRadius: 20,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+
+  transporterBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#92400e",
+  },
+
+  transporterMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+
+  transporterMetaText: {
+    fontSize: 11,
+    color: "#9ca3af",
+    fontWeight: "600",
+  },
+
+  metaDot: {
+    color: "#d1d5db",
+    marginHorizontal: 2,
+  },
+
+  transporterPriceCol: {
+    alignItems: "flex-end",
+    gap: 4,
+  },
+
+  transporterPrice: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#047857",
+  },
+
+  // ── PAYMENT INPUTS
+  input: {
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 13,
+    color: "#1a2e1a",
+    backgroundColor: "#f8faf8",
+    marginBottom: 8,
+  },
+
+  inputRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  inputHalf: {
+    flex: 1,
+  },
+
+  // ── ORDER ITEMS
+  orderItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     marginBottom: 10,
   },
 
-  image: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    marginRight: 10,
+  orderItemImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+  },
+
+  orderItemName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1a2e1a",
+    marginBottom: 2,
+  },
+
+  orderItemQty: {
+    fontSize: 11,
+    color: "#9ca3af",
+    fontWeight: "600",
+  },
+
+  orderItemPrice: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#374151",
   },
 
   divider: {
-    height: 1,
-    backgroundColor: "#eee",
+    height: 0.5,
+    backgroundColor: "#e4efe4",
     marginVertical: 10,
   },
 
-  row: {
+  summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 6,
   },
 
-  button: {
-    backgroundColor: "#0df20d",
-    padding: 15,
-    borderRadius: 12,
-    marginTop: 10,
-    alignItems: "center",
+  summaryLabel: {
+    fontSize: 12,
+    color: "#9ca3af",
+    fontWeight: "600",
   },
 
-  buttonText: {
-    fontWeight: "bold",
+  summaryVal: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#374151",
+  },
+
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+
+  totalLabel: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1a2e1a",
+  },
+
+  totalVal: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1a2e1a",
+    letterSpacing: -0.4,
+  },
+
+  confirmBtn: {
+    backgroundColor: "#0df20d",
+    borderRadius: 12,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+
+  confirmBtnText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#065f46",
   },
 });

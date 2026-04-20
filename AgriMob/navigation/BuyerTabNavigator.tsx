@@ -1,10 +1,10 @@
 import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import type {
   BottomTabBarProps,
-  BottomTabNavigationOptions,
 } from "@react-navigation/bottom-tabs";
 import type { RouteProp } from "@react-navigation/native";
 
@@ -48,48 +48,139 @@ function MarketStackNavigator() {
   );
 }
 
-type TabIconProps = {
-  route: RouteProp<BuyerTabParamList, keyof BuyerTabParamList>;
-  focused: boolean;
-  color: string;
-  size: number;
+// ── Tab icon config ────────────────────────────────────────────────────────────
+
+type TabConfig = {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  iconFocused: keyof typeof MaterialIcons.glyphMap;
+  label: string;
 };
+
+const TAB_CONFIG: Record<keyof BuyerTabParamList, TabConfig> = {
+  Market: {
+    icon: "storefront",
+    iconFocused: "storefront",
+    label: "Market",
+  },
+  Cart: {
+    icon: "shopping-basket",
+    iconFocused: "shopping-basket",
+    label: "Cart",
+  },
+  Orders: {
+    icon: "receipt-long",
+    iconFocused: "receipt-long",
+    label: "Orders",
+  },
+  Profile: {
+    icon: "person-outline",
+    iconFocused: "person",
+    label: "Profile",
+  },
+};
+
+// ── Custom Tab Bar ─────────────────────────────────────────────────────────────
+
+function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  return (
+    <View style={tabStyles.container}>
+      {state.routes.map((route, index) => {
+        const isFocused = state.index === index;
+        const config = TAB_CONFIG[route.name as keyof BuyerTabParamList];
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: "tabPress",
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            onPress={onPress}
+            style={tabStyles.tabItem}
+            activeOpacity={0.7}
+          >
+            <View
+              style={[
+                tabStyles.iconWrap,
+                isFocused && tabStyles.iconWrapActive,
+              ]}
+            >
+              <MaterialIcons
+                name={isFocused ? config.iconFocused : config.icon}
+                size={20}
+                color={isFocused ? "#047857" : "#9ca3af"}
+              />
+            </View>
+            <Text
+              style={[
+                tabStyles.label,
+                isFocused && tabStyles.labelActive,
+              ]}
+            >
+              {config.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+const tabStyles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderTopWidth: 0.5,
+    borderTopColor: "#e5e7eb",
+    paddingTop: 10,
+    paddingBottom: 24, // safe area offset for home bar
+    paddingHorizontal: 8,
+  },
+
+  tabItem: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+  },
+
+  iconWrap: {
+    width: 40,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  iconWrapActive: {
+    backgroundColor: "#d1fae5",
+  },
+
+  label: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#9ca3af",
+    letterSpacing: 0.1,
+  },
+
+  labelActive: {
+    color: "#047857",
+  },
+});
+
+// ── Navigator ─────────────────────────────────────────────────────────────────
 
 export default function BuyerTabNavigator() {
   return (
     <Tab.Navigator
-      screenOptions={({
-        route,
-      }: {
-        route: RouteProp<BuyerTabParamList, keyof BuyerTabParamList>;
-      }) => ({
-        tabBarIcon: ({
-          focused,
-          color,
-          size,
-        }: {
-          focused: boolean;
-          color: string;
-          size: number;
-        }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-
-          if (route.name === "Market") {
-            iconName = focused ? "storefront" : "storefront-outline";
-          } else if (route.name === "Cart") {
-            iconName = focused ? "basket" : "basket-outline";
-          } else if (route.name === "Orders") {
-            iconName = focused ? "list" : "list-outline";
-          } else {
-            iconName = focused ? "person" : "person-outline";
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: "#4CAF50",
-        tabBarInactiveTintColor: "gray",
-        headerShown: false,
-      })}
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Market" component={MarketStackNavigator} />
       <Tab.Screen name="Cart" component={CartScreen} />
