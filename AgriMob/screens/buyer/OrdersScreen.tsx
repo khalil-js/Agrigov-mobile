@@ -12,11 +12,34 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { orderApi } from "../../apis/order.api";
+import { useAuth } from "../../context/AuthContext";
 
 const formatDZD = (value: number) =>
   new Intl.NumberFormat("fr-DZ").format(Math.round(value)) + " DZD";
 
 type OrderStatus = "Delivered" | "In Transit" | "Pending" | "Cancelled";
+
+/** Maps backend snake_case statuses → display labels */
+const STATUS_MAP: Record<string, OrderStatus> = {
+  delivered: "Delivered",
+  in_transit: "In Transit",
+  pending: "Pending",
+  confirmed: "Pending",   // treat confirmed as Pending visually
+  cancelled: "Cancelled",
+};
+
+function mapStatus(raw: string | undefined): OrderStatus {
+  if (!raw) return "Pending";
+  return STATUS_MAP[raw.toLowerCase()] ?? "Pending";
+}
+
+/** Safely extracts a display name from supplier/farm which may be string or object */
+function extractName(val: any): string {
+  if (!val) return "Unknown Farm";
+  if (typeof val === "string") return val;
+  if (typeof val === "object") return val.name ?? val.title ?? val.farm_name ?? "Unknown Farm";
+  return String(val);
+}
 
 interface MappedOrder {
   id: number;
@@ -47,6 +70,7 @@ function statusIcon(status: OrderStatus): keyof typeof MaterialIcons.glyphMap {
 }
 
 export default function OrdersScreen() {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<MappedOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<MappedOrder | null>(null);
@@ -56,36 +80,70 @@ export default function OrdersScreen() {
   const FILTERS = ["All", "In Transit", "Pending", "Delivered"];
 
   React.useEffect(() => {
+    // Only fetch orders when the logged-in user is a BUYER
+    if (!user || user.role !== "BUYER") {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
+
     const fetchOrders = async () => {
       try {
         const response: any = await orderApi.myOrders();
-        const results = response.results ? response.results : response;
-        const mapped: MappedOrder[] = results.map((o: any) => ({
-          id: o.id,
-          order_id: `AG-${1000 + o.id}`,
-          supplier: o.farm || "Unknown Farm",
-          product: o.items?.[0]?.product?.title || "Multiple Items",
-          quantity: o.items?.[0]?.quantity
-            ? `${o.items[0].quantity} kg`
-            : "N/A",
-          amount: parseFloat(o.total_price || 0),
-          status: (o.status as OrderStatus) || "Pending",
-          date: new Date(o.created_at).toLocaleDateString("en-GB", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          }),
-        }));
+        const results: any[] = response?.results
+          ? response.results
+          : Array.isArray(response)
+          ? response
+          : [];
+
+        if (results.length === 0) {
+          setOrders([]);
+          setSelectedOrder(null);
+          return;
+        }
+
+        const mapped: MappedOrder[] = results
+          // Guard against null/undefined entries
+          .filter((o: any) => o != null && o.id != null)
+          .map((o: any) => ({
+            id: o.id,
+            order_id: `AG-${1000 + (o.id as number)}`,
+            // farm/supplier can be a string, an object, or missing
+            supplier: extractName(o.farm ?? o.supplier),
+            product:
+              o.items?.[0]?.product?.title ??
+              o.items?.[0]?.product?.name ??
+              (o.items?.length > 1 ? "Multiple Items" : "Unknown Product"),
+            quantity:
+              o.items?.[0]?.quantity != null
+                ? `${o.items[0].quantity} kg`
+                : "N/A",
+            // total_price comes as a string from DRF serializer
+            amount: parseFloat(o.total_price ?? "0"),
+            // Map backend snake_case → display label
+            status: mapStatus(o.status),
+            date: o.created_at
+              ? new Date(o.created_at).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : "Unknown",
+          }));
+
         setOrders(mapped);
         if (mapped.length > 0) setSelectedOrder(mapped[0]);
       } catch (err) {
-        console.error("Failed to fetch orders:", err);
+        console.error("[OrdersScreen] Failed to fetch orders:", err);
+        setOrders([]);
+        setSelectedOrder(null);
       } finally {
         setLoading(false);
       }
     };
+
     fetchOrders();
-  }, []);
+  }, [user]);
 
   const filtered = orders.filter((o) => {
     const matchSearch =
@@ -228,8 +286,14 @@ export default function OrdersScreen() {
 
 function InvoicePanel({ order }: { order: MappedOrder }) {
   const st = statusStyle(order.status);
-  const transport = 45000;
-  const levy = order.amount * 0.01;
+  const transport = 45000; // TODO: Get real transport cost from order data
+  const levy = (order.amount || 0) * 0.01;
+  const total = (order.amount || 0) + transport + levy;
+
+  // Don't render if order data is invalid
+  if (!order || !order.id) {
+    return null;
+  }
 
   return (
     <View style={styles.invoiceCard}>
@@ -251,9 +315,9 @@ function InvoicePanel({ order }: { order: MappedOrder }) {
 
       <View style={styles.divider} />
 
-      <InvRow label="Product" value={order.product} />
-      <InvRow label="Quantity" value={order.quantity} />
-      <InvRow label="Unit subtotal" value={formatDZD(order.amount)} />
+      <InvRow label="Product" value={order.product || "N/A"} />
+      <InvRow label="Quantity" value={order.quantity || "N/A"} />
+      <InvRow label="Subtotal" value={formatDZD(order.amount || 0)} />
       <InvRow label="Transport" value={formatDZD(transport)} />
       <InvRow label="Levy (1%)" value={formatDZD(levy)} />
 
@@ -262,7 +326,7 @@ function InvoicePanel({ order }: { order: MappedOrder }) {
       <View style={styles.invTotalRow}>
         <Text style={styles.invTotalLabel}>Total</Text>
         <Text style={styles.invTotalVal}>
-          {formatDZD(order.amount + transport + levy)}
+          {formatDZD(total)}
         </Text>
       </View>
 

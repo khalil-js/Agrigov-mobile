@@ -315,7 +315,7 @@ export default function ProductDetailsScreen() {
 
           <TouchableOpacity
             style={styles.buyNowBtn}
-            onPress={() => navigation.navigate("Checkout")}
+            onPress={() => (navigation as any).navigate("Checkout")}
           >
             <Text style={styles.buyNowText}>Buy Now</Text>
             <MaterialIcons name="arrow-forward" size={16} color="#065f46" />

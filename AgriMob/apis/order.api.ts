@@ -15,16 +15,16 @@ export interface CheckoutPayload {
 }
 
 export interface CheckoutResponse {
+  message: string;
+}
+
+/** Shape of an order returned by GET /api/orders/ */
+export interface OrderResponse {
   id: number;
-  order_number: string;
   buyer: string;
   farm: string;
   total_price: string;
   status: "pending" | "confirmed" | "in_transit" | "delivered" | "cancelled";
-  transporter: number | null;
-  transporter_name: string | null;
-  mission: number | null;
-  mission_id: string | null;
   created_at: string;
   items: Array<{
     id: number;
@@ -36,6 +36,7 @@ export interface CheckoutResponse {
     quantity: number;
     total_price: number;
   }>;
+  allowed_statuses: string[];
 }
 
 export const orderApi = {
@@ -48,7 +49,7 @@ export const orderApi = {
   detail: (id: number) =>
     apiFetch(`/api/orders/${id}/`),
 
-  // Buyer's orders
+  // Buyer's orders — the list endpoint is already role-scoped by get_queryset()
   myOrders: () =>
     apiFetch("/api/orders/"),
 
@@ -58,9 +59,9 @@ export const orderApi = {
     return apiFetch(`/api/farmer/orders/${qs}`);
   },
 
-  // Update order status (for farmer)
+  // Update order status — backend action is named change_status
   updateStatus: (id: number, status: "confirmed" | "in_transit" | "delivered" | "cancelled") =>
-    apiFetch(`/api/orders/${id}/status/`, {
+    apiFetch(`/api/orders/${id}/change_status/`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
     }),
