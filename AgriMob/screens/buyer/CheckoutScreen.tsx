@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect } from "@react-navigation/native";
 import { cartApi } from "../../apis/cart.api";
 import { orderApi } from "../../apis/order.api";
 
@@ -52,7 +53,7 @@ export default function CheckoutScreen() {
   const [loading, setLoading] = useState(true);
   const [subtotal, setSubtotal] = useState(0);
   const [selectedTransporter, setSelectedTransporter] = useState<Transporter>(
-    TRANSPORTERS[0]
+    TRANSPORTERS[0],
   );
   const [card, setCard] = useState({
     number: "",
@@ -62,20 +63,22 @@ export default function CheckoutScreen() {
   });
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
-  React.useEffect(() => {
-    const fetchCart = async () => {
-      try {
-        const res: any = await cartApi.get();
-        setProducts(res.items || []);
-        setSubtotal(parseFloat(res.total_price || 0));
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCart();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      const fetchCart = async () => {
+        try {
+          const res: any = await cartApi.get();
+          setProducts(res.items || []);
+          setSubtotal(parseFloat(res.total_price || 0));
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchCart();
+    }, []),
+  );
 
   const levy = subtotal * 0.01;
   const total = subtotal + selectedTransporter.price + levy;
@@ -132,7 +135,9 @@ export default function CheckoutScreen() {
                     <Text style={styles.stepDotNum}>{i + 1}</Text>
                   )}
                 </View>
-                <Text style={[styles.stepLabel, i <= 2 && styles.stepLabelActive]}>
+                <Text
+                  style={[styles.stepLabel, i <= 2 && styles.stepLabelActive]}
+                >
                   {step}
                 </Text>
               </View>
@@ -182,7 +187,11 @@ export default function CheckoutScreen() {
             >
               <View style={styles.transporterLeft}>
                 <View style={styles.transporterAvatar}>
-                  <MaterialIcons name="directions-car" size={16} color="#047857" />
+                  <MaterialIcons
+                    name="directions-car"
+                    size={16}
+                    color="#047857"
+                  />
                 </View>
                 <View>
                   <View style={styles.transporterNameRow}>
@@ -207,9 +216,15 @@ export default function CheckoutScreen() {
                 </View>
               </View>
               <View style={styles.transporterPriceCol}>
-                <Text style={styles.transporterPrice}>{formatDZD(t.price)}</Text>
+                <Text style={styles.transporterPrice}>
+                  {formatDZD(t.price)}
+                </Text>
                 {selectedTransporter.id === t.id && (
-                  <MaterialIcons name="check-circle" size={16} color="#0df20d" />
+                  <MaterialIcons
+                    name="check-circle"
+                    size={16}
+                    color="#0df20d"
+                  />
                 )}
               </View>
             </TouchableOpacity>

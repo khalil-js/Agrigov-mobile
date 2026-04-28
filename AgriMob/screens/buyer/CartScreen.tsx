@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,8 +12,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { MarketStackParamList } from "../../navigation/BuyerTabNavigator";
+import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { useFocusEffect } from "@react-navigation/native";
+import { BuyerTabParamList } from "../../navigation/BuyerTabNavigator";
 import { cartApi } from "../../apis/cart.api";
 
 const formatDZD = (value: number) =>
@@ -21,7 +22,7 @@ const formatDZD = (value: number) =>
 
 export default function CartScreen() {
   const navigation =
-    useNavigation<NativeStackNavigationProp<MarketStackParamList>>();
+    useNavigation<BottomTabNavigationProp<BuyerTabParamList>>();
 
   const [cart, setCart] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,9 +38,11 @@ export default function CartScreen() {
     }
   };
 
-  React.useEffect(() => {
-    fetchCart();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchCart();
+    }, []),
+  );
 
   const updateQuantity = async (id: number, delta: number) => {
     const item = cart.find((i) => i.id === id);
@@ -49,8 +52,8 @@ export default function CartScreen() {
       prev.map((i) =>
         i.id === id
           ? { ...i, quantity: newQty, total_price: i.price * newQty }
-          : i
-      )
+          : i,
+      ),
     );
     try {
       await cartApi.update(id, newQty);
@@ -70,7 +73,7 @@ export default function CartScreen() {
 
   const subtotal = useMemo(
     () => cart.reduce((sum, i) => sum + parseFloat(i.total_price || 0), 0),
-    [cart]
+    [cart],
   );
   const transport = 45000;
   const levy = subtotal * 0.01;
@@ -156,8 +159,7 @@ export default function CartScreen() {
                 {
                   text: "Clear",
                   style: "destructive",
-                  onPress: () =>
-                    cart.forEach((i) => removeItem(i.id)),
+                  onPress: () => cart.forEach((i) => removeItem(i.id)),
                 },
               ])
             }
