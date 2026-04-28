@@ -53,7 +53,7 @@ type TabConfig = {
   label: string;
 };
 
-const TAB_CONFIG: Record<keyof BuyerTabParamList, TabConfig> = {
+const TAB_CONFIG: Partial<Record<keyof BuyerTabParamList, TabConfig>> = {
   Market: {
     icon: "storefront",
     iconFocused: "storefront",
@@ -63,11 +63,6 @@ const TAB_CONFIG: Record<keyof BuyerTabParamList, TabConfig> = {
     icon: "shopping-basket",
     iconFocused: "shopping-basket",
     label: "Cart",
-  },
-  Checkout: {
-    icon: "payment",
-    iconFocused: "payment",
-    label: "Checkout",
   },
   Orders: {
     icon: "receipt-long",
@@ -89,6 +84,8 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       {state.routes.map((route, index) => {
         const isFocused = state.index === index;
         const config = TAB_CONFIG[route.name as keyof BuyerTabParamList];
+
+        if (!config) return null;
 
         const onPress = () => {
           const event = navigation.emit({

@@ -8,6 +8,8 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
+  Linking,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -50,6 +52,7 @@ interface MappedOrder {
   amount: number;
   status: OrderStatus;
   date: string;
+  invoice_pdf: string | null;
 }
 
 function statusStyle(status: OrderStatus) {
@@ -129,6 +132,7 @@ export default function OrdersScreen() {
                   year: "numeric",
                 })
               : "Unknown",
+            invoice_pdf: o.invoice_pdf || null,
           }));
 
         setOrders(mapped);
@@ -286,14 +290,23 @@ export default function OrdersScreen() {
 
 function InvoicePanel({ order }: { order: MappedOrder }) {
   const st = statusStyle(order.status);
-  const transport = 45000; // TODO: Get real transport cost from order data
-  const levy = (order.amount || 0) * 0.01;
-  const total = (order.amount || 0) + transport + levy;
+  const transport = 0; // Backend currently doesn't provide transport cost
+  const total = (order.amount || 0) + transport;
 
   // Don't render if order data is invalid
   if (!order || !order.id) {
     return null;
   }
+
+  const handleDownload = () => {
+    if (order.invoice_pdf) {
+      Linking.openURL(order.invoice_pdf).catch((err) => {
+        Alert.alert("Error", "Could not open the invoice.");
+      });
+    } else {
+      Alert.alert("Not available", "Invoice has not been generated for this order yet.");
+    }
+  };
 
   return (
     <View style={styles.invoiceCard}>
@@ -319,7 +332,6 @@ function InvoicePanel({ order }: { order: MappedOrder }) {
       <InvRow label="Quantity" value={order.quantity || "N/A"} />
       <InvRow label="Subtotal" value={formatDZD(order.amount || 0)} />
       <InvRow label="Transport" value={formatDZD(transport)} />
-      <InvRow label="Levy (1%)" value={formatDZD(levy)} />
 
       <View style={styles.divider} />
 
@@ -330,9 +342,14 @@ function InvoicePanel({ order }: { order: MappedOrder }) {
         </Text>
       </View>
 
-      <TouchableOpacity style={styles.downloadBtn}>
+      <TouchableOpacity 
+        style={[styles.downloadBtn, !order.invoice_pdf && { opacity: 0.5 }]} 
+        onPress={handleDownload}
+      >
         <MaterialIcons name="download" size={16} color="#047857" />
-        <Text style={styles.downloadBtnText}>Download Invoice PDF</Text>
+        <Text style={styles.downloadBtnText}>
+          {order.invoice_pdf ? "Download Invoice PDF" : "Invoice Not Available"}
+        </Text>
       </TouchableOpacity>
     </View>
   );

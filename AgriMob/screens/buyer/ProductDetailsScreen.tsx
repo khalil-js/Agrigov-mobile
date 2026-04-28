@@ -15,7 +15,9 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MarketStackParamList } from "../../navigation/BuyerTabNavigator";
 import { productApi } from "../../apis/product.api";
 import { cartApi } from "../../apis/cart.api";
+import { reviewApi, Review, ReviewsResponse } from "../../apis/review.api";
 import { Alert, ActivityIndicator } from "react-native";
+import { useAuth } from "../../context/AuthContext";
 
 const formatDZD = (value: number) =>
   new Intl.NumberFormat("fr-DZ").format(value) + " DZD";
@@ -46,9 +48,18 @@ export default function ProductDetailsScreen() {
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [quantity, setQuantity] = useState("10");
-  const [activeTab, setActiveTab] = useState<"specs" | "details">("specs");
+  const [activeTab, setActiveTab] = useState<"specs" | "details" | "reviews">("specs");
   const [addingToCart, setAddingToCart] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Review states
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [newRating, setNewRating] = useState(5);
+  const [newComment, setNewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -86,8 +97,51 @@ export default function ProductDetailsScreen() {
         setLoading(false);
       }
     };
+
+    const fetchReviews = async () => {
+      setLoadingReviews(true);
+      try {
+        const response = await reviewApi.forProduct(productId);
+        const data = Array.isArray(response) ? response : (response as ReviewsResponse).results || [];
+        setReviews(data);
+      } catch (err) {
+        console.error("Failed to fetch reviews", err);
+      } finally {
+        setLoadingReviews(false);
+      }
+    };
+
     fetchProduct();
-  }, []);
+    fetchReviews();
+  }, [productId]);
+
+  const handleSubmitReview = async () => {
+    if (!newComment.trim()) {
+      Alert.alert("Error", "Please provide a comment for your review.");
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      await reviewApi.create({
+        product: Number(productId),
+        rating: newRating,
+        comment: newComment.trim(),
+      });
+      Alert.alert("Success", "Review submitted successfully!");
+      setShowReviewForm(false);
+      setNewComment("");
+      setNewRating(5);
+      
+      // Refresh reviews
+      const response = await reviewApi.forProduct(productId);
+      const data = Array.isArray(response) ? response : (response as ReviewsResponse).results || [];
+      setReviews(data);
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to submit review. You can only review products you have purchased and received.");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -98,6 +152,20 @@ export default function ProductDetailsScreen() {
       navigation.getParent()?.navigate("Cart");
     } catch (error) {
       Alert.alert("Error", "Failed to add product to cart.");
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (!product) return;
+    setAddingToCart(true);
+    try {
+      // Must add to cart first since checkout relies on a non-empty cart
+      await cartApi.add(Number(product.id), Number(quantity));
+      navigation.getParent()?.navigate("Checkout");
+    } catch (error) {
+      Alert.alert("Error", "Failed to initiate checkout. Please try again.");
     } finally {
       setAddingToCart(false);
     }
@@ -219,6 +287,19 @@ export default function ProductDetailsScreen() {
               Details
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "reviews" && styles.tabActive]}
+            onPress={() => setActiveTab("reviews")}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "reviews" && styles.tabTextActive,
+              ]}
+            >
+              Reviews ({reviews.length})
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -231,6 +312,81 @@ export default function ProductDetailsScreen() {
             ))}
           {activeTab === "details" && (
             <Text style={styles.descText}>{product.description}</Text>
+          )}
+          {activeTab === "reviews" && (
+            <View style={styles.reviewsContainer}>
+              {loadingReviews ? (
+                <ActivityIndicator size="small" color="#047857" style={{ marginTop: 20 }} />
+              ) : (
+                <>
+                  <View style={styles.reviewsHeader}>
+                     <Text style={styles.reviewsTitle}>Customer Reviews</Text>
+                     {!showReviewForm && user?.role === "BUYER" && (
+                       <TouchableOpacity onPress={() => setShowReviewForm(true)} style={styles.writeReviewBtn}>
+                         <Text style={styles.writeReviewBtnText}>Write a Review</Text>
+                       </TouchableOpacity>
+                     )}
+                  </View>
+                  
+                  {showReviewForm && (
+                    <View style={styles.reviewForm}>
+                      <Text style={styles.reviewFormLabel}>Rating</Text>
+                      <View style={styles.starSelect}>
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <TouchableOpacity key={star} onPress={() => setNewRating(star)}>
+                            <MaterialIcons 
+                               name={star <= newRating ? "star" : "star-border"} 
+                               size={32} 
+                               color={star <= newRating ? "#f59e0b" : "#e5e7eb"} 
+                            />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      
+                      <Text style={styles.reviewFormLabel}>Comment</Text>
+                      <TextInput 
+                         style={styles.reviewInput} 
+                         multiline 
+                         numberOfLines={3} 
+                         value={newComment}
+                         onChangeText={setNewComment}
+                         placeholder="Share your experience..."
+                         placeholderTextColor="#9ca3af"
+                      />
+                      
+                      <View style={styles.reviewFormActions}>
+                        <TouchableOpacity onPress={() => setShowReviewForm(false)} style={styles.cancelBtn}>
+                          <Text style={styles.cancelBtnText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={handleSubmitReview} style={styles.submitReviewBtn} disabled={submittingReview}>
+                           {submittingReview ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.submitReviewBtnText}>Submit</Text>}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  {reviews.length === 0 ? (
+                    <Text style={styles.noReviewsText}>No reviews yet for this product.</Text>
+                  ) : (
+                    reviews.map((review, index) => (
+                      <View key={review.id || index} style={styles.reviewCard}>
+                        <View style={styles.reviewCardHeader}>
+                          <View style={styles.reviewStars}>
+                             {[1, 2, 3, 4, 5].map(s => (
+                               <MaterialIcons key={s} name={s <= review.rating ? "star" : "star-border"} size={16} color={s <= review.rating ? "#f59e0b" : "#e5e7eb"} />
+                             ))}
+                          </View>
+                          <Text style={styles.reviewDate}>
+                            {new Date(review.created_at).toLocaleDateString()}
+                          </Text>
+                        </View>
+                        <Text style={styles.reviewComment}>{review.comment}</Text>
+                      </View>
+                    ))
+                  )}
+                </>
+              )}
+            </View>
           )}
         </View>
 
@@ -315,10 +471,17 @@ export default function ProductDetailsScreen() {
 
           <TouchableOpacity
             style={styles.buyNowBtn}
-            onPress={() => (navigation as any).navigate("Checkout")}
+            onPress={handleBuyNow}
+            disabled={addingToCart}
           >
-            <Text style={styles.buyNowText}>Buy Now</Text>
-            <MaterialIcons name="arrow-forward" size={16} color="#065f46" />
+            {addingToCart ? (
+              <ActivityIndicator color="#065f46" size="small" />
+            ) : (
+              <>
+                <Text style={styles.buyNowText}>Buy Now</Text>
+                <MaterialIcons name="arrow-forward" size={16} color="#065f46" />
+              </>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -753,5 +916,125 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     color: "#047857",
+  },
+  
+  // ── REVIEWS
+  reviewsContainer: {
+    marginTop: 4,
+  },
+  reviewsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  reviewsTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1a2e1a",
+  },
+  writeReviewBtn: {
+    backgroundColor: "#d1fae5",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  writeReviewBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#047857",
+  },
+  reviewForm: {
+    backgroundColor: "#f8faf8",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+    marginBottom: 20,
+  },
+  reviewFormLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: 8,
+  },
+  starSelect: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+  },
+  reviewInput: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: "#1f2937",
+    minHeight: 80,
+    textAlignVertical: "top",
+    marginBottom: 16,
+  },
+  reviewFormActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  cancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  cancelBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6b7280",
+  },
+  submitReviewBtn: {
+    backgroundColor: "#0df20d",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  submitReviewBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#065f46",
+  },
+  noReviewsText: {
+    fontSize: 14,
+    color: "#6b7280",
+    fontStyle: "italic",
+    textAlign: "center",
+    marginTop: 20,
+  },
+  reviewCard: {
+    backgroundColor: "#f8faf8",
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 0.5,
+    borderColor: "#e4efe4",
+  },
+  reviewCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  reviewStars: {
+    flexDirection: "row",
+    gap: 2,
+  },
+  reviewDate: {
+    fontSize: 11,
+    color: "#9ca3af",
+  },
+  reviewComment: {
+    fontSize: 13,
+    color: "#374151",
+    lineHeight: 18,
   },
 });

@@ -179,7 +179,7 @@ export default function CheckoutScreen() {
 
       Alert.alert(
         "Order Placed!",
-        `Your order ${result.order_number} has been placed successfully.`,
+        `Your order has been placed successfully.`,
         [
           {
             text: "View Orders",
