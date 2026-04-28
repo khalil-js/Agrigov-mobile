@@ -10,6 +10,8 @@ import NotificationsScreen from "../screens/profile/Notificationsscreen";
 import PaymentMethodsScreen from "../screens/profile/Paymentmethodsscreen";
 import SecurityScreen from "../screens/profile/Securityscreen";
 import HelpSupportScreen from "../screens/profile/Helpsupportscreen";
+import MyReviewsScreen from "../screens/profile/MyReviewsScreen";
+
 export type ProfileStackParamList = {
   ProfileMain: undefined;
   EditProfile: undefined;
@@ -17,6 +19,7 @@ export type ProfileStackParamList = {
   PaymentMethods: undefined;
   Security: undefined;
   HelpSupport: undefined;
+  MyReviews: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -34,6 +37,7 @@ export default function ProfileStack() {
       <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
       <Stack.Screen name="Security" component={SecurityScreen} />
       <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+      <Stack.Screen name="MyReviews" component={MyReviewsScreen} />
     </Stack.Navigator>
   );
 }

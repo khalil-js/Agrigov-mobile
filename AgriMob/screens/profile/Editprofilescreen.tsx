@@ -88,7 +88,13 @@ export default function EditProfileScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await profileApi.update(form);
+      // Map form keys → backend field names accepted by MeView.patch()
+      const payload: Record<string, string> = {};
+      if (form.username)  payload.username = form.username.replace(/^@/, "");
+      if (form.email)     payload.email    = form.email;
+      if (form.phone)     payload.phone    = form.phone;
+
+      await profileApi.update(payload);
       navigation.goBack();
     } catch (e) {
       Alert.alert("Error", "Could not save changes. Please try again.");

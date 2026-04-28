@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, CommonActions } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useAuth } from "../../context/AuthContext";
 import { profileApi } from "../../apis/profile.api";
@@ -24,23 +24,81 @@ type ProfileNav = NativeStackNavigationProp<any>;
 
 function getRoleStat(
   role: string,
-  extras: Record<string, number>
-): { icon: React.ComponentProps<typeof MaterialIcons>["name"]; value: number; label: string } {
+  extras: Record<string, number>,
+): {
+  icon: React.ComponentProps<typeof MaterialIcons>["name"];
+  value: number;
+  label: string;
+} {
   if (role === "FARMER") {
-    return { icon: "agriculture", value: extras?.farms_count ?? 0, label: "Farms" };
+    return {
+      icon: "agriculture",
+      value: extras?.farms_count ?? 0,
+      label: "Farms",
+    };
   }
   if (role === "TRANSPORTER") {
-    return { icon: "local-shipping", value: extras?.vehicles_count ?? 0, label: "Vehicles" };
+    return {
+      icon: "local-shipping",
+      value: extras?.vehicles_count ?? 0,
+      label: "Vehicles",
+    };
   }
-  return { icon: "shopping-bag", value: extras?.orders_count ?? 0, label: "Orders" };
+  return {
+    icon: "shopping-bag",
+    value: extras?.orders_count ?? 0,
+    label: "Orders",
+  };
+}
+
+// ─── get badge info ───────────────────────────────────────────────────────────
+
+function getAchievementBadge(
+  value: number,
+  type: "rating" | "member",
+): { text: string; color: string } | null {
+  if (type === "rating") {
+    if (value >= 4.5) return { text: "Excellent Rating", color: "#d97706" };
+    if (value >= 4.0) return { text: "Great Rating", color: "#059669" };
+    return null;
+  }
+  if (type === "member") {
+    if (value >= 3) return { text: "Loyal Member", color: "#059669" };
+    if (value >= 1) return { text: "Verified Member", color: "#047857" };
+    return null;
+  }
+  return null;
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
-const HeroStat = ({ value, label }: { value: string | number; label: string }) => (
+const HeroStat = ({
+  value,
+  label,
+  icon,
+  badge,
+}: {
+  value: string | number;
+  label: string;
+  icon?: React.ComponentProps<typeof MaterialIcons>["name"];
+  badge?: { text: string; color: string } | null;
+}) => (
   <View style={styles.heroStatBox}>
+    {icon && (
+      <MaterialIcons
+        name={icon}
+        size={18}
+        color="#a7f3d0"
+        style={styles.heroStatIcon}
+      />
+    )}
     <Text style={styles.heroStatVal}>{value}</Text>
     <Text style={styles.heroStatLbl}>{label}</Text>
+    {badge && (
+      <View style={[styles.heroStatBadge, { backgroundColor: badge.color }]}>
+        <Text style={styles.heroStatBadgeText}>{badge.text}</Text>
+      </View>
+    )}
   </View>
 );
 
@@ -57,7 +115,11 @@ const SettingRow = ({
   sub?: string;
   onPress?: () => void;
 }) => (
-  <TouchableOpacity style={styles.settingRow} onPress={onPress} activeOpacity={0.7}>
+  <TouchableOpacity
+    style={styles.settingRow}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
     <View style={[styles.settingIcon, { backgroundColor: iconBg }]}>
       <MaterialIcons name={icon} size={18} color="#555" />
     </View>
@@ -90,15 +152,37 @@ const ProfileScreen = () => {
     })();
   }, []);
 
+  // MeView returns { status, code, data: { user, profile, extras } }
+  const meData = profileData?.data ?? profileData; // handle both shapes
   const role = user?.role ?? "BUYER";
-  const extras = profileData?.extras ?? {};
+  const extras = meData?.extras ?? {};
   const roleStat = getRoleStat(role, extras);
   const displayName = user?.username ?? user?.email ?? "User";
   const initials = displayName.slice(0, 2).toUpperCase();
 
+  // Compute real stats with proper formatting
+  const ratingValue = extras?.rating ?? 0;
+  const ratingDisplay = ratingValue > 0 ? `${ratingValue.toFixed(1)}★` : "—";
+  const ratingBadge =
+    ratingValue > 0 ? getAchievementBadge(ratingValue, "rating") : null;
+
+  const memberYears = extras?.member_since_years ?? 0;
+  const memberDisplay = `${memberYears}y`;
+  const memberBadge =
+    memberYears > 0 ? getAchievementBadge(memberYears, "member") : null;
+
+  // Navigate to the Orders tab (sibling tab in BuyerTabNavigator)
+  const goToOrders = () =>
+    navigation.dispatch(CommonActions.navigate({ name: "Orders" }));
+
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+      <SafeAreaView
+        style={[
+          styles.container,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
         <ActivityIndicator size="large" color="#047857" />
       </SafeAreaView>
     );
@@ -107,7 +191,6 @@ const ProfileScreen = () => {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView showsVerticalScrollIndicator={false}>
-
         {/* ── HERO HEADER ── */}
         <View style={styles.hero}>
           <View style={styles.heroTopRow}>
@@ -116,7 +199,11 @@ const ProfileScreen = () => {
               style={styles.settingsBtn}
               onPress={() => navigation.navigate("EditProfile")}
             >
-              <MaterialIcons name="settings" size={20} color="rgba(255,255,255,0.8)" />
+              <MaterialIcons
+                name="settings"
+                size={20}
+                color="rgba(255,255,255,0.8)"
+              />
             </TouchableOpacity>
           </View>
 
@@ -138,13 +225,31 @@ const ProfileScreen = () => {
           </View>
 
           <View style={styles.heroStats}>
-            <HeroStat value={roleStat.value} label={roleStat.label} />
+            <HeroStat
+              icon={roleStat.icon}
+              value={roleStat.value}
+              label={roleStat.label}
+            />
             <View style={styles.heroStatDivider} />
-            <HeroStat value={extras?.orders_count ?? 24} label="Orders" />
+            <HeroStat
+              icon="shopping-bag"
+              value={extras?.orders_count ?? 0}
+              label="Orders"
+            />
             <View style={styles.heroStatDivider} />
-            <HeroStat value="4.9★" label="Rating" />
+            <HeroStat
+              icon="star"
+              value={ratingDisplay}
+              label="Rating"
+              badge={ratingBadge}
+            />
             <View style={styles.heroStatDivider} />
-            <HeroStat value="2y" label="Member" />
+            <HeroStat
+              icon="calendar-today"
+              value={memberDisplay}
+              label="Member"
+              badge={memberBadge}
+            />
           </View>
         </View>
 
@@ -188,13 +293,15 @@ const ProfileScreen = () => {
             icon="receipt-long"
             iconBg="#f0faf0"
             label="Order History"
-            sub={`${extras?.orders_count ?? 24} completed orders`}
+            sub={`${extras?.orders_count ?? 0} completed orders`}
+            onPress={goToOrders}
           />
           <SettingRow
             icon="star"
             iconBg="#f0faf0"
             label="Reviews & Ratings"
-            sub="4.9 avg from 38 reviews"
+            sub="View your product reviews"
+            onPress={() => navigation.navigate("MyReviews")}
           />
         </View>
 
@@ -205,7 +312,11 @@ const ProfileScreen = () => {
           activeOpacity={0.85}
         >
           <View style={styles.supportIconBox}>
-            <MaterialIcons name="support-agent" size={22} color="rgba(255,255,255,0.9)" />
+            <MaterialIcons
+              name="support-agent"
+              size={22}
+              color="rgba(255,255,255,0.9)"
+            />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.supportTitle}>Help & Support</Text>
@@ -217,11 +328,14 @@ const ProfileScreen = () => {
         </TouchableOpacity>
 
         {/* ── LOGOUT ── */}
-        <TouchableOpacity style={styles.logoutRow} onPress={logout} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.logoutRow}
+          onPress={logout}
+          activeOpacity={0.8}
+        >
           <MaterialIcons name="logout" size={18} color="#b91c1c" />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -241,8 +355,8 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: "#047857",
     paddingHorizontal: 16,
-    paddingBottom: 0,
-    paddingTop: 16,
+    paddingBottom: 4,
+    paddingTop: 10,
   },
 
   heroTopRow: {
@@ -340,29 +454,51 @@ const styles = StyleSheet.create({
 
   heroStats: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.1)",
+    borderTopColor: "rgba(255,255,255,0.15)",
     marginHorizontal: -16,
+    marginTop: 16,
     paddingHorizontal: 0,
   },
 
   heroStatBox: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     alignItems: "center",
+  },
+
+  heroStatIcon: {
+    marginBottom: 6,
   },
 
   heroStatVal: {
     fontSize: 16,
     fontWeight: "800",
     color: "#fff",
+    marginBottom: 2,
   },
 
   heroStatLbl: {
-    fontSize: 10,
+    fontSize: 11,
     color: "#a7f3d0",
-    marginTop: 2,
+    fontWeight: "600",
+  },
+
+  heroStatBadge: {
+    marginTop: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: "#d97706",
+  },
+
+  heroStatBadgeText: {
+    fontSize: 8,
+    fontWeight: "700",
+    color: "#fff",
+    letterSpacing: 0.3,
   },
 
   heroStatDivider: {
