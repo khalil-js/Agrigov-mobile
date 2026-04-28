@@ -27,13 +27,19 @@ class ReviewSerializer(serializers.ModelSerializer):
         if self.instance is None:
             has_purchased = OrderItem.objects.filter(
                 order__buyer=buyer_profile,
-                product=product,
+                product_item__product=product,
                 order__status='delivered'
             ).exists()
 
             if not has_purchased:
                 raise serializers.ValidationError({
-                    "product": "You can only review products you have purchased."
+                    "product": "You can only review products you have purchased and received."
+                })
+
+            # Check for existing review
+            if Review.objects.filter(product=product, buyer=buyer_profile).exists():
+                raise serializers.ValidationError({
+                    "product": "You have already reviewed this product."
                 })
 
         attrs['buyer'] = buyer_profile
@@ -46,7 +52,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
         has_purchased = OrderItem.objects.filter(
             order__buyer=buyer,
-            product=product,
+            product_item__product=product,
             order__status='delivered'
         ).exists()
 
