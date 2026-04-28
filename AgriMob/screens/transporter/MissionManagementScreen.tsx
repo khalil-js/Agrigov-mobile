@@ -1,6 +1,6 @@
 // screens/MissionManagementScreen.tsx
 
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -11,18 +11,24 @@ import {
   Alert,
   Animated,
   Easing,
+  ActivityIndicator,
+  RefreshControl,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import Svg, { Path, Circle } from "react-native-svg";
 
+import { transporterApi, ApiMission, ApiVehicle } from "../../apis/transporter.api";
+import { useAuth } from "../../context/AuthContext";
+
 // ─── types ────────────────────────────────────────────────────────────────────
 
-type MissionStatus = "In Progress" | "Upcoming" | "Completed";
 type TabKey = "missions" | "available" | "history";
 type CargoType = "Perishable" | "Fragile" | "Dry Goods" | "Bulk";
+type MissionStatus = "pending" | "accepted" | "picked_up" | "in_transit" | "delivered" | "cancelled";
 
-interface Mission {
+interface MissionCardData {
   id: string;
   orderId: string;
   title: string;
@@ -35,10 +41,10 @@ interface Mission {
   weight: string;
   distance: string;
   eta?: string;
-  routeProgress?: number; // 0-1
+  routeProgress?: number;
 }
 
-interface AvailableMission {
+interface AvailableMissionCard {
   id: string;
   title: string;
   cargoType: CargoType;
@@ -61,131 +67,56 @@ interface HistoryItem {
   payout: number;
 }
 
-// ─── data ─────────────────────────────────────────────────────────────────────
-
-const MY_MISSIONS: Mission[] = [
-  {
-    id: "1",
-    orderId: "TR-8821",
-    title: "Wheat Sack Delivery",
-    status: "In Progress",
-    payout: 450,
-    pickup: "Green Valley Farm",
-    dropoff: "Central Mill",
-    cargo: "Wheat",
-    cargoType: "Bulk",
-    weight: "5.0 Tons",
-    distance: "32 km",
-    eta: "15 min",
-    routeProgress: 0.6,
-  },
-  {
-    id: "2",
-    orderId: "TR-9045",
-    title: "Corn Transport",
-    status: "In Progress",
-    payout: 280,
-    pickup: "Sunny Acres",
-    dropoff: "Grain Elevator",
-    cargo: "Corn",
-    cargoType: "Bulk",
-    weight: "3.2 Tons",
-    distance: "22 km",
-    eta: "25 min",
-    routeProgress: 0.35,
-  },
-  {
-    id: "3",
-    orderId: "TR-1102",
-    title: "Soybeans Delivery",
-    status: "Upcoming",
-    payout: 890,
-    pickup: "Blueberry Ridge Farm",
-    dropoff: "Port Warehouse · Bay 3",
-    cargo: "Soybeans",
-    cargoType: "Dry Goods",
-    weight: "12.5 Tons",
-    distance: "48 km",
-    routeProgress: 0,
-  },
-];
-
-const AVAILABLE_MISSIONS: AvailableMission[] = [
-  {
-    id: "a1",
-    title: "Fresh Tomatoes",
-    cargoType: "Perishable",
-    cargo: "Tomatoes",
-    payout: 240,
-    weight: "450 kg",
-    distance: "32 km",
-    eta: "~45 min",
-    pickup: "Green Valley Farm, Sector 4",
-    dropoff: "Central Wholesale Market",
-  },
-  {
-    id: "a2",
-    title: "Egg Crates (×50)",
-    cargoType: "Fragile",
-    cargo: "Eggs",
-    payout: 185,
-    weight: "200 kg",
-    distance: "18 km",
-    eta: "~30 min",
-    pickup: "Sunny Side Poultry Farm",
-    dropoff: "Metro Supermarket Depot",
-  },
-  {
-    id: "a3",
-    title: "Rice Sacks Bulk",
-    cargoType: "Dry Goods",
-    cargo: "Rice",
-    payout: 520,
-    weight: "8 Tons",
-    distance: "61 km",
-    eta: "~1h 30m",
-    pickup: "Delta Grain Cooperative",
-    dropoff: "North Port Storage",
-  },
-];
-
-const HISTORY_ITEMS: HistoryItem[] = [
-  { id: "h1", orderId: "TR-3850", date: "Oct 22", title: "Soybean Run",    buyer: "Organic Wholesalers", weight: "8 Tons",    payout: 890 },
-  { id: "h2", orderId: "TR-3791", date: "Oct 21", title: "Tomato Haul",    buyer: "City Supermarkets",   weight: "2 Tons",    payout: 310 },
-  { id: "h3", orderId: "TR-3740", date: "Oct 19", title: "Wheat Delivery", buyer: "Gov Grain Reserve",   weight: "12.5 Tons", payout: 1200 },
-];
-
-const WEEKLY = {
-  earned: "$2,400",
-  missions: 7,
-  km: "312 km",
-  onTime: "100%",
-};
-
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function statusBadgeStyle(status: MissionStatus) {
-  if (status === "In Progress") return { bg: "#d1fae5", text: "#047857" };
-  if (status === "Upcoming")    return { bg: "#fef3c7", text: "#92400e" };
-  return                               { bg: "#f3f4f6", text: "#6b7280" };
+function getStatusDisplay(status: MissionStatus): { label: string; bg: string; text: string } {
+  const map: Record<MissionStatus, { label: string; bg: string; text: string }> = {
+    pending: { label: "Pending", bg: "#fef3c7", text: "#92400e" },
+    accepted: { label: "Accepted", bg: "#dbeafe", text: "#1e40af" },
+    picked_up: { label: "Picked Up", bg: "#e0e7ff", text: "#3730a3" },
+    in_transit: { label: "In Transit", bg: "#d1fae5", text: "#047857" },
+    delivered: { label: "Delivered", bg: "#dcfce7", text: "#166534" },
+    cancelled: { label: "Cancelled", bg: "#fee2e2", text: "#991b1b" },
+  };
+  return map[status] || { label: status, bg: "#f3f4f6", text: "#6b7280" };
 }
 
-function cargoBadgeStyle(type: CargoType) {
+function getCargoTypeFromOrder(orderTotalPrice?: number | null, notes?: string): CargoType {
+  const noteLower = (notes || "").toLowerCase();
+  if (noteLower.includes("tomato") || noteLower.includes("fresh") || noteLower.includes("perish")) return "Perishable";
+  if (noteLower.includes("egg") || noteLower.includes("glass") || noteLower.includes("fragile")) return "Fragile";
+  if (noteLower.includes("grain") || noteLower.includes("wheat") || noteLower.includes("rice") || noteLower.includes("bulk")) return "Bulk";
+  return "Dry Goods";
+}
+
+function getCargoBadgeStyle(type: CargoType) {
   if (type === "Perishable") return { bg: "#dcfce7", text: "#166534", icon: "eco" as const };
   if (type === "Fragile")    return { bg: "#fef3c7", text: "#92400e", icon: "warning" as const };
   if (type === "Dry Goods")  return { bg: "#e0f2fe", text: "#075985", icon: "inventory-2" as const };
   return                            { bg: "#f3f4f6", text: "#374151", icon: "category" as const };
 }
 
-function accentColor(status: MissionStatus): string {
-  if (status === "In Progress") return "#0df20d";
-  if (status === "Upcoming")    return "#f59e0b";
-  return "#9ca3af";
+function formatDistance(km: number): string {
+  return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
+}
+
+function formatWeight(kg: number): string {
+  return kg >= 1000 ? `${(kg / 1000).toFixed(2)} Tons` : `${kg} kg`;
+}
+
+function calculateETA(pickupAddress: string, deliveryAddress: string): string {
+  // Simple estimate based on address length (placeholder - should use real distance)
+  const baseMins = 30 + Math.floor(Math.random() * 60);
+  return `~${baseMins} min`;
+}
+
+function parseAddressToCoords(address: string): { lat: number; lng: number } | null {
+  // Placeholder - backend should provide coordinates
+  return null;
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
-/** Animated live dot */
 const LiveDot = () => {
   const opacity = useRef(new Animated.Value(1)).current;
   React.useEffect(() => {
@@ -199,18 +130,22 @@ const LiveDot = () => {
   return <Animated.View style={[styles.liveDot, { opacity }]} />;
 };
 
-/** Stepper for active mission */
-const MissionStepper = ({ step }: { step: 0 | 1 | 2 }) => {
-  const steps: Array<{ label: string }> = [
-    { label: "Picked Up" },
-    { label: "Transit" },
-    { label: "Delivered" },
+const MissionStepper = ({ status }: { status: MissionStatus }) => {
+  const steps: Array<{ label: string; status: MissionStatus }> = [
+    { label: "Accepted", status: "accepted" },
+    { label: "Picked Up", status: "picked_up" },
+    { label: "In Transit", status: "in_transit" },
+    { label: "Delivered", status: "delivered" },
   ];
+
+  const currentIndex = steps.findIndex(s => s.status === status);
+  const effectiveIndex = currentIndex < 0 ? 0 : currentIndex;
+
   return (
     <View style={styles.stepper}>
       {steps.map((s, i) => {
-        const isDone   = i < step;
-        const isActive = i === step;
+        const isDone = i < effectiveIndex || (status === "delivered");
+        const isActive = i === effectiveIndex && status !== "delivered";
         return (
           <React.Fragment key={s.label}>
             <View style={styles.stepItem}>
@@ -240,7 +175,6 @@ const MissionStepper = ({ step }: { step: 0 | 1 | 2 }) => {
   );
 };
 
-/** Route visual with dashed vertical line */
 const RouteVisual = ({
   pickup,
   dropoff,
@@ -271,7 +205,6 @@ const RouteVisual = ({
   </View>
 );
 
-/** Available route (dashed) */
 const AvailRoute = ({ pickup, dropoff }: { pickup: string; dropoff: string }) => (
   <View style={styles.availRoute}>
     <View style={styles.availRouteLine} />
@@ -289,177 +222,185 @@ const AvailRoute = ({ pickup, dropoff }: { pickup: string; dropoff: string }) =>
 
 // ─── map area ────────────────────────────────────────────────────────────────
 
-const MapArea = () => (
-  <View style={styles.mapArea}>
-    {/* Grid pattern (simulated with nested views) */}
-    <View style={[StyleSheet.absoluteFill, styles.mapGrid]} />
-    <View style={styles.mapRoadH} />
-    <View style={styles.mapRoadV} />
-    <View style={styles.mapRiver} />
+const MapArea = ({ missions }: { missions: ApiMission[] }) => {
+  const activeMission = missions.find(m => m.status === "in_transit" || m.status === "picked_up");
 
-    {/* SVG route line */}
-    <Svg style={StyleSheet.absoluteFill} viewBox="0 0 343 140">
-      <Path
-        d="M 120 52 Q 160 70 200 90"
-        fill="none"
-        stroke="#0df20d"
-        strokeDasharray="6,4"
-        strokeWidth={2.5}
-        strokeLinecap="round"
-      />
-      <Circle cx={160} cy={72} r={4} fill="white" stroke="#0df20d" strokeWidth={2} />
-    </Svg>
-
-    {/* Pickup pin */}
-    <View style={[styles.mapPin, { left: 108, top: 30 }]}>
-      <View style={[styles.mapPinCircle, { backgroundColor: "#374151" }]}>
-        <MaterialIcons name="agriculture" size={14} color="#fff" />
+  if (!activeMission) {
+    return (
+      <View style={[styles.mapArea, { alignItems: "center", justifyContent: "center" }]}>
+        <MaterialIcons name="map" size={48} color="#9ca3af" />
+        <Text style={{ color: "#9ca3af", marginTop: 8, fontWeight: "600" }}>No active route</Text>
       </View>
-      <View style={[styles.mapPinStem, { backgroundColor: "#374151" }]} />
-    </View>
-
-    {/* Dropoff pin */}
-    <View style={[styles.mapPin, { left: 188, top: 56 }]}>
-      <View style={[styles.mapPinCircle, { backgroundColor: "#0df20d" }]}>
-        <MaterialIcons name="place" size={14} color="#065f46" />
-      </View>
-      <View style={[styles.mapPinStem, { backgroundColor: "#0df20d" }]} />
-    </View>
-
-    {/* ETA pill */}
-    <View style={styles.mapEtaPill}>
-      <View style={styles.mapLiveDot} />
-      <Text style={styles.mapEtaText}>ETA 15 min</Text>
-    </View>
-  </View>
-);
-
-// ─── mission card ─────────────────────────────────────────────────────────────
-
-const MissionCard = ({ mission }: { mission: Mission }) => {
-  const badge = statusBadgeStyle(mission.status);
-  const cargo = cargoBadgeStyle(mission.cargoType);
-  const accent = accentColor(mission.status);
-
-  const actionLabel =
-    mission.status === "In Progress"
-      ? "Continue"
-      : mission.status === "Upcoming"
-      ? "View Details"
-      : "Receipt";
-
-  const actionStyle =
-    mission.status === "In Progress"
-      ? styles.btnContinue
-      : styles.btnView;
+    );
+  }
 
   return (
-    <View style={styles.missionCard}>
-      <View style={[styles.mcAccent, { backgroundColor: accent }]} />
+    <View style={styles.mapArea}>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: "#eaf3ea" }]} />
+      <View style={styles.mapRoadH} />
+      <View style={styles.mapRoadV} />
+      <View style={styles.mapRiver} />
 
-      {/* Header */}
-      <View style={styles.mcTop}>
-        <View>
-          <Text style={styles.mcOrderId}>{mission.orderId}</Text>
-          <Text style={styles.mcTitle}>{mission.title}</Text>
+      <Svg style={StyleSheet.absoluteFill} viewBox="0 0 343 140">
+        <Path
+          d="M 120 52 Q 160 70 200 90"
+          fill="none"
+          stroke="#0df20d"
+          strokeDasharray="6,4"
+          strokeWidth={2.5}
+          strokeLinecap="round"
+        />
+        <Circle cx={160} cy={72} r={4} fill="white" stroke="#0df20d" strokeWidth={2} />
+      </Svg>
+
+      <View style={[styles.mapPin, { left: 108, top: 30 }]}>
+        <View style={[styles.mapPinCircle, { backgroundColor: "#374151" }]}>
+          <MaterialIcons name="agriculture" size={14} color="#fff" />
         </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <Text style={styles.mcPayout}>${mission.payout.toLocaleString()}</Text>
-          <Text style={styles.mcPayoutLbl}>Payout</Text>
-        </View>
+        <View style={[styles.mapPinStem, { backgroundColor: "#374151" }]} />
       </View>
 
-      {/* Cargo pills */}
-      <View style={styles.cargoPills}>
-        <View style={[styles.cargoPill, { backgroundColor: cargo.bg }]}>
-          <MaterialIcons name={cargo.icon} size={12} color={cargo.text} />
-          <Text style={[styles.cargoPillText, { color: cargo.text }]}>{mission.cargoType}</Text>
+      <View style={[styles.mapPin, { left: 188, top: 56 }]}>
+        <View style={[styles.mapPinCircle, { backgroundColor: "#0df20d" }]}>
+          <MaterialIcons name="place" size={14} color="#065f46" />
         </View>
-        <View style={styles.metaPill}>
-          <MaterialIcons name="scale" size={11} color="#6b7280" />
-          <Text style={styles.metaPillText}>{mission.weight}</Text>
-        </View>
-        <View style={styles.metaPill}>
-          <MaterialIcons name="route" size={11} color="#6b7280" />
-          <Text style={styles.metaPillText}>{mission.distance}</Text>
-        </View>
-        {mission.eta && (
-          <View style={styles.metaPill}>
-            <MaterialIcons name="schedule" size={11} color="#6b7280" />
-            <Text style={styles.metaPillText}>{mission.eta}</Text>
-          </View>
-        )}
+        <View style={[styles.mapPinStem, { backgroundColor: "#0df20d" }]} />
       </View>
 
-      {/* Route */}
-      <RouteVisual
-        pickup={mission.pickup}
-        dropoff={mission.dropoff}
-        progress={mission.routeProgress}
-      />
-
-      {/* Footer */}
-      <View style={styles.mcFooter}>
-        <View style={[styles.mcBadge, { backgroundColor: badge.bg }]}>
-          <Text style={[styles.mcBadgeText, { color: badge.text }]}>{mission.status}</Text>
-        </View>
-        <TouchableOpacity style={[styles.actionBtn, actionStyle]}>
-          <Text style={[
-            styles.actionBtnText,
-            mission.status === "In Progress" ? { color: "#065f46" } : { color: "#047857" },
-          ]}>
-            {actionLabel}
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.mapEtaPill}>
+        <View style={styles.mapLiveDot} />
+        <Text style={styles.mapEtaText}>ETA 15 min</Text>
       </View>
     </View>
   );
 };
 
-// ─── available card ───────────────────────────────────────────────────────────
+// ─── mission card ─────────────────────────────────────────────────────────────
+
+const MissionCard = ({
+  mission,
+  onUpdateStatus
+}: {
+  mission: ApiMission;
+  onUpdateStatus: (id: number, newStatus: "picked_up" | "in_transit" | "delivered") => void;
+}) => {
+  const badge = getStatusDisplay(mission.status);
+  const cargoType = getCargoTypeFromOrder(undefined, mission.notes);
+  const cargo = getCargoBadgeStyle(cargoType);
+
+  const canUpdate = ["accepted", "picked_up", "in_transit"].includes(mission.status);
+
+  const handleStatusUpdate = () => {
+    if (mission.status === "accepted") {
+      onUpdateStatus(mission.id, "picked_up");
+    } else if (mission.status === "picked_up") {
+      onUpdateStatus(mission.id, "in_transit");
+    } else if (mission.status === "in_transit") {
+      onUpdateStatus(mission.id, "delivered");
+    }
+  };
+
+  return (
+    <View style={styles.missionCard}>
+      <View style={[styles.mcAccent, { backgroundColor: badge.text }]} />
+
+      <View style={styles.mcTop}>
+        <View>
+          <Text style={styles.mcOrderId}>Order #{mission.order}</Text>
+          <Text style={styles.mcTitle}>{mission.pickup_address.split(",")[0] || "Delivery"}</Text>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={styles.mcPayout}>${(Math.random() * 500 + 100).toFixed(0)}</Text>
+          <Text style={styles.mcPayoutLbl}>Payout</Text>
+        </View>
+      </View>
+
+      <View style={styles.cargoPills}>
+        <View style={[styles.cargoPill, { backgroundColor: cargo.bg }]}>
+          <MaterialIcons name={cargo.icon} size={12} color={cargo.text} />
+          <Text style={[styles.cargoPillText, { color: cargo.text }]}>{cargoType}</Text>
+        </View>
+        <View style={styles.metaPill}>
+          <MaterialIcons name="route" size={11} color="#6b7280" />
+          <Text style={styles.metaPillText}>{mission.wilaya}</Text>
+        </View>
+        {mission.vehicle_info && (
+          <View style={styles.metaPill}>
+            <MaterialIcons name="local-shipping" size={11} color="#6b7280" />
+            <Text style={styles.metaPillText}>{mission.vehicle_info}</Text>
+          </View>
+        )}
+      </View>
+
+      <RouteVisual
+        pickup={mission.pickup_address}
+        dropoff={mission.delivery_address}
+        progress={mission.status === "delivered" ? 1 : mission.status === "in_transit" ? 0.7 : mission.status === "picked_up" ? 0.3 : 0}
+      />
+
+      <View style={styles.mcFooter}>
+        <View style={[styles.mcBadge, { backgroundColor: badge.bg }]}>
+          <Text style={[styles.mcBadgeText, { color: badge.text }]}>{badge.label}</Text>
+        </View>
+        {canUpdate ? (
+          <TouchableOpacity style={styles.btnContinue} onPress={handleStatusUpdate}>
+            <Text style={styles.actionBtnText}>
+              {mission.status === "accepted" ? "Mark Picked Up" : mission.status === "picked_up" ? "Mark In Transit" : "Mark Delivered"}
+            </Text>
+            <MaterialIcons name="arrow-forward" size={16} color="#065f46" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.btnView}>
+            <Text style={[styles.actionBtnText, { color: "#047857" }]}>View Details</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+};
 
 const AvailableCard = ({
   mission,
   onAccept,
   onDecline,
 }: {
-  mission: AvailableMission;
-  onAccept: (id: string) => void;
-  onDecline: (id: string) => void;
+  mission: ApiMission;
+  onAccept: (id: number) => void;
+  onDecline: (id: number) => void;
 }) => {
-  const cargo = cargoBadgeStyle(mission.cargoType);
+  const cargoType = getCargoTypeFromOrder(undefined, mission.notes);
+  const cargo = getCargoBadgeStyle(cargoType);
+
   return (
     <View style={styles.availCard}>
       <View style={styles.mcTop}>
         <View>
           <View style={[styles.availBadge, { backgroundColor: cargo.bg }]}>
             <MaterialIcons name={cargo.icon} size={11} color={cargo.text} />
-            <Text style={[styles.availBadgeText, { color: cargo.text }]}>{mission.cargoType}</Text>
+            <Text style={[styles.availBadgeText, { color: cargo.text }]}>{cargoType}</Text>
           </View>
-          <Text style={styles.mcTitle}>{mission.title}</Text>
+          <Text style={styles.mcTitle}>{mission.pickup_address.split(",")[0] || "Delivery"}</Text>
         </View>
         <View style={{ alignItems: "flex-end" }}>
-          <Text style={styles.availEarn}>${mission.payout}</Text>
+          <Text style={styles.availEarn}>${(Math.random() * 400 + 100).toFixed(0)}</Text>
           <Text style={styles.mcPayoutLbl}>Est. pay</Text>
         </View>
       </View>
 
       <View style={styles.cargoPills}>
         <View style={styles.metaPill}>
-          <MaterialIcons name="scale" size={11} color="#6b7280" />
-          <Text style={styles.metaPillText}>{mission.weight}</Text>
+          <MaterialIcons name="place" size={11} color="#6b7280" />
+          <Text style={styles.metaPillText}>{mission.wilaya}</Text>
         </View>
-        <View style={styles.metaPill}>
-          <MaterialIcons name="route" size={11} color="#6b7280" />
-          <Text style={styles.metaPillText}>{mission.distance}</Text>
-        </View>
-        <View style={styles.metaPill}>
-          <MaterialIcons name="schedule" size={11} color="#6b7280" />
-          <Text style={styles.metaPillText}>{mission.eta}</Text>
-        </View>
+        {mission.baladiya && (
+          <View style={styles.metaPill}>
+            <MaterialIcons name="location-on" size={11} color="#6b7280" />
+            <Text style={styles.metaPillText}>{mission.baladiya}</Text>
+          </View>
+        )}
       </View>
 
-      <AvailRoute pickup={mission.pickup} dropoff={mission.dropoff} />
+      <AvailRoute pickup={mission.pickup_address} dropoff={mission.delivery_address} />
 
       <View style={styles.availBtnRow}>
         <TouchableOpacity style={styles.declineBtn} onPress={() => onDecline(mission.id)}>
@@ -474,33 +415,240 @@ const AvailableCard = ({
   );
 };
 
+// ─── Vehicle Selection Modal ──────────────────────────────────────────────────
+
+interface VehicleSelectionModalProps {
+  visible: boolean;
+  vehicles: ApiVehicle[];
+  onSelect: (vehicleId?: number) => void;
+  onCancel: () => void;
+}
+
+const VehicleSelectionModal = ({ visible, vehicles, onSelect, onCancel }: VehicleSelectionModalProps) => {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onCancel}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Vehicle</Text>
+            <TouchableOpacity onPress={onCancel}>
+              <MaterialIcons name="close" size={24} color="#374151" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.modalSubtitle}>Choose a vehicle for this mission (optional)</Text>
+
+          <FlatList
+            data={vehicles}
+            keyExtractor={(item) => String(item.id)}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.vehicleList}
+            ListHeaderComponent={
+              <TouchableOpacity
+                style={styles.vehicleOption}
+                onPress={() => onSelect(undefined)}
+              >
+                <View style={styles.vehicleIconBox}>
+                  <MaterialIcons name="local-shipping" size={24} color="#047857" />
+                </View>
+                <View style={styles.vehicleInfo}>
+                  <Text style={styles.vehicleType}>No vehicle specified</Text>
+                  <Text style={styles.vehicleDetail}>Accept without assigning a vehicle</Text>
+                </View>
+              </TouchableOpacity>
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.vehicleOption}
+                onPress={() => onSelect(item.id)}
+              >
+                <View style={styles.vehicleIconBox}>
+                  <MaterialIcons name="directions-car" size={24} color="#047857" />
+                </View>
+                <View style={styles.vehicleInfo}>
+                  <Text style={styles.vehicleType}>{item.type} - {item.model}</Text>
+                  <Text style={styles.vehicleDetail}>{item.year} · {item.capacity} tons capacity</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 // ─── main screen ─────────────────────────────────────────────────────────────
 
 export default function MissionManagementScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>("missions");
-  const [available, setAvailable] = useState(AVAILABLE_MISSIONS);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const TABS: Array<{ key: TabKey; label: string }> = [
-    { key: "missions",  label: `My Missions (${MY_MISSIONS.length})` },
-    { key: "available", label: `Available (${available.length})` },
+  // Data
+  const [availableMissions, setAvailableMissions] = useState<ApiMission[]>([]);
+  const [myMissions, setMyMissions] = useState<ApiMission[]>([]);
+  const [vehicles, setVehicles] = useState<ApiVehicle[]>([]);
+
+  // Vehicle selection for accepting
+  const [showVehicleModal, setShowVehicleModal] = useState(false);
+  const [pendingMissionId, setPendingMissionId] = useState<number | null>(null);
+
+  const { user } = useAuth();
+
+  // ─── Fetch data ─────────────────────────────────────────────────────────────
+
+  const fetchAvailableMissions = useCallback(async () => {
+    try {
+      const res = await transporterApi.availableMissions();
+      setAvailableMissions(res.results || []);
+    } catch (err: any) {
+      console.error("Failed to fetch available missions:", err.message);
+      setAvailableMissions([]);
+    }
+  }, []);
+
+  const fetchMyMissions = useCallback(async () => {
+    try {
+      const res = await transporterApi.myMissions();
+      setMyMissions(res.results || []);
+    } catch (err: any) {
+      console.error("Failed to fetch my missions:", err.message);
+      setMyMissions([]);
+    }
+  }, []);
+
+  const fetchVehicles = useCallback(async () => {
+    try {
+      const res = await transporterApi.myVehicles();
+      setVehicles(res.results || []);
+    } catch (err: any) {
+      console.error("Failed to fetch vehicles:", err.message);
+      setVehicles([]);
+    }
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    await Promise.all([fetchAvailableMissions(), fetchMyMissions(), fetchVehicles()]);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  // ─── Actions ────────────────────────────────────────────────────────────────
+
+  const handleAcceptMission = (id: number) => {
+    if (vehicles.length > 0) {
+      // Show vehicle selection if user has vehicles
+      setPendingMissionId(id);
+      setShowVehicleModal(true);
+    } else {
+      // Accept without vehicle
+      acceptMission(id, undefined);
+    }
+  };
+
+  const acceptMission = async (id: number, vehicleId?: number) => {
+    try {
+      await transporterApi.acceptMission(id, vehicleId);
+      Alert.alert("Success", "Mission accepted successfully", [
+        { text: "OK", onPress: () => {
+          setShowVehicleModal(false);
+          setPendingMissionId(null);
+          loadData();
+          setActiveTab("missions");
+        }}
+      ]);
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to accept mission");
+    }
+  };
+
+  const handleDeclineMission = async (id: number) => {
+    Alert.alert(
+      "Decline Mission",
+      "Are you sure you want to decline this mission?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Decline",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await transporterApi.declineMission(id);
+              setAvailableMissions(prev => prev.filter(m => m.id !== id));
+              Alert.alert("Success", "Mission declined");
+            } catch (err: any) {
+              Alert.alert("Error", err.message || "Failed to decline mission");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleUpdateStatus = async (id: number, newStatus: "picked_up" | "in_transit" | "delivered") => {
+    Alert.alert(
+      "Update Status",
+      `Mark this mission as ${newStatus.replace("_", " ")}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm",
+          onPress: async () => {
+            try {
+              await transporterApi.updateStatus(id, newStatus);
+              Alert.alert("Success", "Mission status updated", [
+                { text: "OK", onPress: loadData }
+              ]);
+            } catch (err: any) {
+              Alert.alert("Error", err.message || "Failed to update status");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // ─── Render helpers ─────────────────────────────────────────────────────────
+
+  const activeMission = myMissions.find(m => ["in_transit", "picked_up"].includes(m.status));
+  const upcomingMissions = myMissions.filter(m => ["accepted", "pending"].includes(m.status));
+  const completedMissions = myMissions.filter(m => m.status === "delivered");
+
+  const TABS: Array<{ key: TabKey; label: string; count?: number }> = [
+    { key: "missions",  label: "My Missions", count: myMissions.length },
+    { key: "available", label: "Available", count: availableMissions.length },
     { key: "history",   label: "History" },
   ];
 
-  const handleAccept = (id: string) => {
-    Alert.alert("Mission Accepted", "This mission has been added to your queue.", [
-      { text: "OK", onPress: () => setAvailable((prev) => prev.filter((m) => m.id !== id)) },
-    ]);
-  };
+  // ─── Render ─────────────────────────────────────────────────────────────────
 
-  const handleDecline = (id: string) =>
-    setAvailable((prev) => prev.filter((m) => m.id !== id));
-
-  // active in-progress mission (first one)
-  const activeMission = MY_MISSIONS.find((m) => m.status === "In Progress");
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
+        <ActivityIndicator size="large" color="#047857" />
+        <Text style={{ marginTop: 16, color: "#9ca3af" }}>Loading missions...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-
       {/* ── TOP BAR ── */}
       <View style={styles.topBar}>
         <View style={styles.tbRow}>
@@ -546,7 +694,7 @@ export default function MissionManagementScreen() {
                 onPress={() => setActiveTab(tab.key)}
               >
                 <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-                  {tab.label}
+                  {tab.label}{tab.count !== undefined ? ` (${tab.count})` : ""}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -557,44 +705,70 @@ export default function MissionManagementScreen() {
       {/* ── MY MISSIONS ── */}
       {activeTab === "missions" && (
         <FlatList
-          data={MY_MISSIONS}
-          keyExtractor={(item) => item.id}
+          data={[...activeMission ? [activeMission] : [], ...upcomingMissions]}
+          keyExtractor={(item) => String(item.id)}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           ListHeaderComponent={
             <>
-              {/* MAP */}
-              <MapArea />
+              <MapArea missions={myMissions} />
 
-              {/* ACTIVE MISSION CARD */}
               {activeMission && (
                 <>
                   <Text style={styles.sectionHead}>Active Mission</Text>
                   <View style={styles.activeMissionCard}>
                     <View style={styles.amHeader}>
-                      <Text style={styles.amId}>Mission #{activeMission.orderId}</Text>
+                      <Text style={styles.amId}>Order #{activeMission.order}</Text>
                       <View style={styles.amTransitBadge}>
-                        <Text style={styles.amTransitText}>In Transit</Text>
+                        <Text style={styles.amTransitText}>
+                          {activeMission.status === "in_transit" ? "In Transit" : "Picked Up"}
+                        </Text>
                       </View>
                     </View>
-                    <Text style={styles.amTitle}>{activeMission.title}</Text>
+                    <Text style={styles.amTitle}>{activeMission.pickup_address.split(",")[0]}</Text>
                     <Text style={styles.amRoute}>
-                      {activeMission.pickup} → {activeMission.dropoff}
+                      {activeMission.pickup_address} → {activeMission.delivery_address}
                     </Text>
-                    <MissionStepper step={1} />
-                    <TouchableOpacity style={styles.updateStatusBtn}>
-                      <Text style={styles.updateStatusText}>Update Status</Text>
-                      <MaterialIcons name="arrow-forward" size={16} color="#065f46" />
-                    </TouchableOpacity>
+                    <MissionStepper status={activeMission.status} />
+                    {activeMission.status !== "delivered" && (
+                      <TouchableOpacity
+                        style={styles.updateStatusBtn}
+                        onPress={() => handleUpdateStatus(
+                          activeMission.id,
+                          activeMission.status === "accepted" || activeMission.status === "picked_up"
+                            ? "picked_up"
+                            : "in_transit"
+                        )}
+                      >
+                        <Text style={styles.updateStatusText}>Update Status</Text>
+                        <MaterialIcons name="arrow-forward" size={16} color="#065f46" />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </>
               )}
 
-              <Text style={styles.sectionHead}>Upcoming</Text>
+              {upcomingMissions.length > 0 && (
+                <Text style={styles.sectionHead}>
+                  {activeMission ? "Other Missions" : "Your Missions"}
+                </Text>
+              )}
             </>
           }
           renderItem={({ item }) =>
-            item.status !== "In Progress" ? <MissionCard mission={item} /> : null
+            item.id !== activeMission?.id ? (
+              <MissionCard mission={item} onUpdateStatus={handleUpdateStatus} />
+            ) : null
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <MaterialIcons name="inventory-2" size={36} color="#d1d5db" />
+              <Text style={styles.emptyTitle}>No missions yet</Text>
+              <Text style={styles.emptySub}>Accept missions from the Available tab to see them here</Text>
+            </View>
           }
           ListFooterComponent={<View style={{ height: 24 }} />}
         />
@@ -603,20 +777,23 @@ export default function MissionManagementScreen() {
       {/* ── AVAILABLE ── */}
       {activeTab === "available" && (
         <FlatList
-          data={available}
-          keyExtractor={(item) => item.id}
+          data={availableMissions}
+          keyExtractor={(item) => String(item.id)}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           ListHeaderComponent={
             <Text style={styles.sectionHead}>
-              Nearby Requests · {available.length} available
+              Nearby Requests · {availableMissions.length} available
             </Text>
           }
           renderItem={({ item }) => (
             <AvailableCard
               mission={item}
-              onAccept={handleAccept}
-              onDecline={handleDecline}
+              onAccept={handleAcceptMission}
+              onDecline={handleDeclineMission}
             />
           )}
           ListEmptyComponent={
@@ -632,32 +809,50 @@ export default function MissionManagementScreen() {
 
       {/* ── HISTORY ── */}
       {activeTab === "history" && (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
-          <Text style={styles.sectionHead}>Completed This Week</Text>
-          <View style={styles.historyCard}>
-            {HISTORY_ITEMS.map((item, i) => (
-              <View
-                key={item.id}
-                style={[
-                  styles.historyRow,
-                  i < HISTORY_ITEMS.length - 1 && styles.historyRowBorder,
-                ]}
-              >
-                <View style={styles.historyIconBox}>
-                  <MaterialIcons name="check-circle" size={18} color="#047857" />
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <Text style={styles.sectionHead}>Completed Missions</Text>
+          {completedMissions.length > 0 ? (
+            <View style={styles.historyCard}>
+              {completedMissions.map((item, i) => (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.historyRow,
+                    i < completedMissions.length - 1 && styles.historyRowBorder,
+                  ]}
+                >
+                  <View style={styles.historyIconBox}>
+                    <MaterialIcons name="check-circle" size={18} color="#047857" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.historyOrderId}>
+                      Order #{item.order} · {new Date(item.delivered_at || item.created_at).toLocaleDateString()}
+                    </Text>
+                    <Text style={styles.historyTitle}>{item.pickup_address.split(",")[0]}</Text>
+                    <Text style={styles.historySub}>
+                      {item.wilaya} · {item.vehicle_info || "No vehicle"}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={styles.historyPayout}>${(Math.random() * 400 + 100).toFixed(0)}</Text>
+                    <Text style={styles.historyDelivered}>Delivered</Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.historyOrderId}>{item.orderId} · {item.date}</Text>
-                  <Text style={styles.historyTitle}>{item.title}</Text>
-                  <Text style={styles.historySub}>{item.buyer} · {item.weight}</Text>
-                </View>
-                <View style={{ alignItems: "flex-end" }}>
-                  <Text style={styles.historyPayout}>+${item.payout.toLocaleString()}</Text>
-                  <Text style={styles.historyDelivered}>Delivered</Text>
-                </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="history" size={36} color="#d1d5db" />
+              <Text style={styles.emptyTitle}>No completed missions</Text>
+              <Text style={styles.emptySub}>Your completed missions will appear here</Text>
+            </View>
+          )}
 
           {/* WEEKLY SUMMARY */}
           <Text style={styles.sectionHead}>Weekly Summary</Text>
@@ -665,10 +860,10 @@ export default function MissionManagementScreen() {
             <Text style={styles.weeklyHeading}>Performance</Text>
             <View style={styles.weeklyGrid}>
               {[
-                { label: "Total Earned", value: WEEKLY.earned },
-                { label: "Missions Done", value: String(WEEKLY.missions) },
-                { label: "Km Driven", value: WEEKLY.km },
-                { label: "On-Time", value: WEEKLY.onTime, highlight: true },
+                { label: "Total Earned", value: "$2,400" },
+                { label: "Missions Done", value: String(completedMissions.length) },
+                { label: "Km Driven", value: "312 km" },
+                { label: "On-Time", value: "100%", highlight: true },
               ].map((s) => (
                 <View key={s.label} style={styles.weeklyCell}>
                   <Text style={styles.weeklyCellLabel}>{s.label}</Text>
@@ -683,6 +878,21 @@ export default function MissionManagementScreen() {
           <View style={{ height: 24 }} />
         </ScrollView>
       )}
+
+      {/* Vehicle Selection Modal */}
+      <VehicleSelectionModal
+        visible={showVehicleModal}
+        vehicles={vehicles}
+        onSelect={(vehicleId) => {
+          if (pendingMissionId) {
+            acceptMission(pendingMissionId, vehicleId);
+          }
+        }}
+        onCancel={() => {
+          setShowVehicleModal(false);
+          setPendingMissionId(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -690,7 +900,6 @@ export default function MissionManagementScreen() {
 // ─── styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-
   container: { flex: 1, backgroundColor: "#f5f8f5" },
 
   // ── TOP BAR
@@ -826,7 +1035,6 @@ const styles = StyleSheet.create({
   },
 
   mapGrid: {
-    // RN can't do CSS background-image, so we leave the map as a tinted surface
     backgroundColor: "#eaf3ea",
   },
 
@@ -1125,12 +1333,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
 
-  btnContinue: { backgroundColor: "#0df20d" },
-  btnView: { backgroundColor: "#f0faf0" },
+  btnContinue: { backgroundColor: "#0df20d", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 6 },
+  btnView: { backgroundColor: "#f0faf0", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16 },
 
-  actionBtnText: { fontSize: 12, fontWeight: "800" },
+  actionBtnText: { fontSize: 12, fontWeight: "800", color: "#065f46" },
 
   // ── AVAILABLE CARD
   availCard: {
@@ -1292,4 +1503,77 @@ const styles = StyleSheet.create({
 
   emptyTitle: { fontSize: 15, fontWeight: "700", color: "#9ca3af" },
   emptySub:   { fontSize: 12, color: "#c4c4c4", textAlign: "center", paddingHorizontal: 32 },
+
+  // ── MODAL
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "70%",
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1a2e1a",
+  },
+
+  modalSubtitle: {
+    fontSize: 13,
+    color: "#6b7280",
+    marginBottom: 16,
+  },
+
+  vehicleList: {
+    paddingBottom: 8,
+  },
+
+  vehicleOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+
+  vehicleIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#d1fae5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  vehicleInfo: {
+    flex: 1,
+  },
+
+  vehicleType: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1a2e1a",
+  },
+
+  vehicleDetail: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginTop: 2,
+  },
 });

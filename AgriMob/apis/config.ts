@@ -14,7 +14,7 @@
 //   • 127.0.0.1      → points to the phone itself, not your computer
 //   • localhost       → same problem
 
-export const BASE_URL = "http://192.168.1.12:8000"; // ← change this
+export const BASE_URL = "http://192.168.1.2:8000"; // ← change this
 
 // Single key used by BOTH storage.ts and AuthContext — no more mismatches
 export const TOKEN_KEY   = "auth_access";

@@ -20,7 +20,7 @@ const getBaseUrl = () => {
   //return "http://10.0.2.2:8000/api";
 
   // Physical device - replace with your machine's IP
-   return "http://192.168.1.12:8000/api";
+  return "http://192.168.1.2:8000/api";
 
   // Production
   // return "https://your-production-domain.com/api";

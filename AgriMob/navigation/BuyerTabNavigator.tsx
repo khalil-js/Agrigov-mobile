@@ -3,9 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { MaterialIcons } from "@expo/vector-icons";
-import type {
-  BottomTabBarProps,
-} from "@react-navigation/bottom-tabs";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import type { RouteProp } from "@react-navigation/native";
 
 // Import screens
@@ -19,12 +17,12 @@ import ProfileStack from "./ProfileStack";
 export type MarketStackParamList = {
   ProductCatalog: undefined;
   ProductDetails: { productId: string };
-  Checkout: undefined;
 };
 
 export type BuyerTabParamList = {
   Market: undefined;
   Cart: undefined;
+  Checkout: undefined;
   Orders: undefined;
   Profile: undefined;
 };
@@ -43,7 +41,6 @@ function MarketStackNavigator() {
         name="ProductDetails"
         component={ProductDetailsScreen}
       />
-      <MarketStack.Screen name="Checkout" component={CheckoutScreen} />
     </MarketStack.Navigator>
   );
 }
@@ -66,6 +63,11 @@ const TAB_CONFIG: Record<keyof BuyerTabParamList, TabConfig> = {
     icon: "shopping-basket",
     iconFocused: "shopping-basket",
     label: "Cart",
+  },
+  Checkout: {
+    icon: "payment",
+    iconFocused: "payment",
+    label: "Checkout",
   },
   Orders: {
     icon: "receipt-long",
@@ -118,12 +120,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 color={isFocused ? "#047857" : "#9ca3af"}
               />
             </View>
-            <Text
-              style={[
-                tabStyles.label,
-                isFocused && tabStyles.labelActive,
-              ]}
-            >
+            <Text style={[tabStyles.label, isFocused && tabStyles.labelActive]}>
               {config.label}
             </Text>
           </TouchableOpacity>
@@ -184,6 +181,7 @@ export default function BuyerTabNavigator() {
     >
       <Tab.Screen name="Market" component={MarketStackNavigator} />
       <Tab.Screen name="Cart" component={CartScreen} />
+      <Tab.Screen name="Checkout" component={CheckoutScreen} />
       <Tab.Screen name="Orders" component={OrdersScreen} />
       <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
