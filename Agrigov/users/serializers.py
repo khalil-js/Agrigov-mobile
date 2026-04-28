@@ -103,6 +103,18 @@ class FarmerProfileSerializer(serializers.ModelSerializer):
             "national_id_image",
         ]
 
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not user or user.role != User.ROLE_FARMER:
+            raise serializers.ValidationError("Only farmers can create profiles")
+        if hasattr(user, "farmer_profile"):
+            raise serializers.ValidationError("Farmer profile already exists")
+
+        validated_data.setdefault("farmer_card_image", "")
+        validated_data.setdefault("national_id_image", "")
+        return FarmerProfile.objects.create(user=user, **validated_data)
+
     def get_farmer_card_image(self, obj):
         return build_cloudinary_url(obj.farmer_card_image)
 
@@ -131,6 +143,18 @@ class TransporterProfileSerializer(serializers.ModelSerializer):
             "vehicle_capacity",
         ]
 
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not user or user.role != User.ROLE_TRANSPORTER:
+            raise serializers.ValidationError("Only transporters can create profiles")
+        if hasattr(user, "transporter_profile"):
+            raise serializers.ValidationError("Transporter profile already exists")
+
+        validated_data.setdefault("driver_license_image", "")
+        validated_data.setdefault("grey_card_image", "")
+        return TransporterProfile.objects.create(user=user, **validated_data)
+
     def get_driver_license_image(self, obj):
         return build_cloudinary_url(obj.driver_license_image)
 
@@ -139,7 +163,7 @@ class TransporterProfileSerializer(serializers.ModelSerializer):
 
 
 class BuyerProfileSerializer(serializers.ModelSerializer):
-    bussiness_license_image = serializers.ImageField(write_only=True)
+    bussiness_license_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = BuyerProfile
@@ -147,23 +171,26 @@ class BuyerProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ["is_validated", "validated_at", "rejection_reason", "rejected_at"]
 
     def create(self, validated_data):
-        user = self.context["request"].user
-        if user.role != User.ROLE_BUYER:
-            raise serializers.ValidationError("Only buyers allowed")
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not user or user.role != User.ROLE_BUYER:
+            raise serializers.ValidationError("Only buyers can create profiles")
         if hasattr(user, "buyer_profile"):
-            raise serializers.ValidationError("Profile already exists")
+            raise serializers.ValidationError("Buyer profile already exists")
+
+        validated_data.setdefault("bussiness_license_image", "")
         return BuyerProfile.objects.create(user=user, **validated_data)
 
 
 class MinistryProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source="user.email", read_only=True)
     role = serializers.CharField(source="user.role", read_only=True)
-    
+
     class Meta:
         model = MinistryProfile
         fields = ["id", "user", "email", "role", "phone", "office_address", "created_at", "updated_at"]
         read_only_fields = ["id", "user", "email", "role", "created_at", "updated_at"]
-    
+
     def create(self, validated_data):
         user = self.context["request"].user
         if user.role != User.ROLE_ADMIN:
@@ -175,7 +202,7 @@ class MinistryProfileSerializer(serializers.ModelSerializer):
             phone=validated_data.get("phone", ""),
             office_address=validated_data.get("office_address", "")
         )
-    
+
     def update(self, instance, validated_data):
         instance.phone = validated_data.get("phone", instance.phone)
         instance.office_address = validated_data.get("office_address", instance.office_address)
@@ -189,13 +216,13 @@ class MinistryProfileSerializer(serializers.ModelSerializer):
 
 class ValidateUserSerializer(serializers.Serializer):
     user_id = serializers.IntegerField()
-    
+
     def validate_user_id(self, value):
         try:
             user = User.objects.get(id=value)
         except User.DoesNotExist:
             raise serializers.ValidationError("User not found")
-        
+
         if user.role == "FARMER" and not hasattr(user, 'farmer_profile'):
             raise serializers.ValidationError("Farmer has no profile")
         if user.role == "TRANSPORTER" and not hasattr(user, 'transporter_profile'):
@@ -208,13 +235,13 @@ class ValidateUserSerializer(serializers.Serializer):
 class RejectUserSerializer(serializers.Serializer):
     user_id = serializers.IntegerField()
     reason = serializers.CharField(max_length=500, required=True)
-    
+
     def validate_user_id(self, value):
         try:
             user = User.objects.get(id=value)
         except User.DoesNotExist:
             raise serializers.ValidationError("User not found")
-        
+
         if user.role == "FARMER" and not hasattr(user, 'farmer_profile'):
             raise serializers.ValidationError("Farmer has no profile")
         if user.role == "TRANSPORTER" and not hasattr(user, 'transporter_profile'):
@@ -222,7 +249,7 @@ class RejectUserSerializer(serializers.Serializer):
         if user.role == "BUYER" and not hasattr(user, 'buyer_profile'):
             raise serializers.ValidationError("Buyer has no profile")
         return value
-    
+
     def validate_reason(self, value):
         import html
         return html.escape(value[:500])

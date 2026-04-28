@@ -4,7 +4,7 @@ from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from django.db.models import Q
 
 from missions.permissions import IsAdmin
@@ -99,7 +99,7 @@ class MeView(APIView):
 class FarmerProfileView(generics.CreateAPIView):
     serializer_class = FarmerProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_serializer_context(self):
         return super().get_serializer_context()
@@ -108,7 +108,7 @@ class FarmerProfileView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         profile = serializer.save()
-        
+
         return Response(
             {
                 "status": "success",
@@ -125,7 +125,7 @@ class FarmerProfileView(generics.CreateAPIView):
 class TransporterProfileView(generics.CreateAPIView):
     serializer_class = TransporterProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_serializer_context(self):
         return super().get_serializer_context()
@@ -134,7 +134,7 @@ class TransporterProfileView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         profile = serializer.save()
-        
+
         return Response(
             {
                 "status": "success",
@@ -151,7 +151,7 @@ class TransporterProfileView(generics.CreateAPIView):
 class BuyerProfileView(generics.CreateAPIView):
     serializer_class = BuyerProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_serializer_context(self):
         return super().get_serializer_context()
@@ -160,7 +160,7 @@ class BuyerProfileView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         profile = serializer.save()
-        
+
         return Response(
             {
                 "status": "success",
@@ -177,10 +177,10 @@ class BuyerProfileView(generics.CreateAPIView):
 class MinistryProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = MinistryProfileSerializer
     permission_classes = [IsAdmin]
-    
+
     def get_queryset(self):
         return MinistryProfile.objects.filter(user=self.request.user)
-    
+
     def get_object(self):
         user = self.request.user
         profile, created = MinistryProfile.objects.get_or_create(user=user)
@@ -189,7 +189,7 @@ class MinistryProfileView(generics.RetrieveUpdateAPIView):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
-        
+
         return Response(
             {
                 "status": "success",
@@ -205,7 +205,7 @@ class MinistryProfileView(generics.RetrieveUpdateAPIView):
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
-        
+
         return Response(
             {
                 "status": "success",
@@ -230,20 +230,20 @@ class PendingUsersView(generics.ListAPIView):
         validated_farmers = FarmerProfile.objects.filter(
             is_validated=True
         ).values_list('user_id', flat=True)
-        
+
         # Get IDs of validated transporters
         validated_transporters = TransporterProfile.objects.filter(
             is_validated=True
         ).values_list('user_id', flat=True)
-        
+
         # Get IDs of validated buyers
         validated_buyers = BuyerProfile.objects.filter(
             is_validated=True
         ).values_list('user_id', flat=True)
-        
+
         # Combine all validated user IDs
         validated_ids = set(validated_farmers) | set(validated_transporters) | set(validated_buyers)
-        
+
         # Get users who are NOT validated
         return User.objects.filter(
             role__in=["FARMER", "TRANSPORTER", "BUYER"]
@@ -252,7 +252,7 @@ class PendingUsersView(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
-        
+
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response({
@@ -260,7 +260,7 @@ class PendingUsersView(generics.ListAPIView):
                 "code": status.HTTP_200_OK,
                 "data": serializer.data
             })
-        
+
         serializer = self.get_serializer(queryset, many=True)
         return Response(
             {
@@ -333,7 +333,7 @@ class ValidateUserView(APIView):
             profile.rejection_reason = ""
             profile.rejected_at = None
             profile.save()
-        
+
         elif user.role == "TRANSPORTER":
             profile = user.transporter_profile
             profile.is_validated = True
@@ -342,7 +342,7 @@ class ValidateUserView(APIView):
             profile.rejection_reason = ""
             profile.rejected_at = None
             profile.save()
-        
+
         elif user.role == "BUYER":
             profile = user.buyer_profile
             profile.is_validated = True
@@ -351,7 +351,7 @@ class ValidateUserView(APIView):
             profile.rejection_reason = ""
             profile.rejected_at = None
             profile.save()
-        
+
         else:
             return Response(
                 {
@@ -429,7 +429,7 @@ class RejectUserView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Validate reason length
         if len(reason) > 500:
             return Response(
@@ -483,7 +483,7 @@ class RejectUserView(APIView):
             profile.rejected_at = now
             profile.validated_by = request.user
             profile.save()
-        
+
         elif user.role == "TRANSPORTER":
             profile = user.transporter_profile
             profile.is_validated = False
@@ -491,7 +491,7 @@ class RejectUserView(APIView):
             profile.rejected_at = now
             profile.validated_by = request.user
             profile.save()
-        
+
         elif user.role == "BUYER":
             profile = user.buyer_profile
             profile.is_validated = False
@@ -499,7 +499,7 @@ class RejectUserView(APIView):
             profile.rejected_at = now
             profile.validated_by = request.user
             profile.save()
-        
+
         else:
             return Response(
                 {
@@ -550,10 +550,10 @@ class UserDetailView(generics.RetrieveAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         user = self.get_object()
-        
+
         # Add profile data based on role
         data = UserSerializer(user).data
-        
+
         if user.role == "FARMER" and hasattr(user, 'farmer_profile'):
             profile = user.farmer_profile
             data['profile'] = {
@@ -575,7 +575,7 @@ class UserDetailView(generics.RetrieveAPIView):
                     'rejected_at': profile.rejected_at,
                 }
             }
-        
+
         elif user.role == "TRANSPORTER" and hasattr(user, 'transporter_profile'):
             profile = user.transporter_profile
             data['profile'] = {
@@ -595,7 +595,7 @@ class UserDetailView(generics.RetrieveAPIView):
                     'rejected_at': profile.rejected_at,
                 }
             }
-        
+
         elif user.role == "BUYER" and hasattr(user, 'buyer_profile'):
             profile = user.buyer_profile
             data['profile'] = {
@@ -612,7 +612,7 @@ class UserDetailView(generics.RetrieveAPIView):
                     'rejected_at': profile.rejected_at,
                 }
             }
-        
+
         return Response(
             {
                 "status": "success",
@@ -623,7 +623,7 @@ class UserDetailView(generics.RetrieveAPIView):
             },
             status=status.HTTP_200_OK
         )
-        
+
 class AllUsersView(generics.ListAPIView):
     permission_classes = [IsAdmin]
     serializer_class = UserSerializer

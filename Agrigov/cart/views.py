@@ -42,6 +42,13 @@ class CartViewSet(viewsets.ViewSet):
         product = get_object_or_404(Product, id=serializer.validated_data['product_id'])
 
         cart = self.get_cart(request.user)
+
+        # Check stock before adding
+        existing_item = CartItem.objects.filter(cart=cart, product=product).first()
+        total_quantity = serializer.validated_data['quantity'] + (existing_item.quantity if existing_item else 0)
+        if total_quantity > product.stock:
+            return Response({'error': f'Not enough stock. Available: {product.stock}'}, status=400)
+
         add_to_cart(cart, product, serializer.validated_data['quantity'])
 
         return Response({"message": "Item added to cart successfully"}, status=status.HTTP_200_OK)
@@ -49,11 +56,14 @@ class CartViewSet(viewsets.ViewSet):
     # -------------------
     # REMOVE ITEM (RESTFUL ✅)
     # -------------------
-    @action(detail=False, methods=['delete'], url_path='remove-item/(?P<product_id>[^/.]+)')
-    def remove_item(self, request, product_id=None):
-        cart = self.get_cart(request.user)
+    @action(detail=False, methods=['delete'])
+    def remove_item(self, request):
+        item_id = request.data.get('item_id')
+        if not item_id:
+            return Response({'error': 'item_id required'}, status=400)
 
-        item = get_object_or_404(CartItem, cart=cart, product_id=product_id)
+        cart = self.get_cart(request.user)
+        item = get_object_or_404(CartItem, id=item_id, cart=cart)
         item.delete()
 
         return Response({"message": "Item removed from cart successfully"}, status=status.HTTP_200_OK)

@@ -97,7 +97,12 @@ CORS_ALLOWED_ORIGINS = [
         "http://192.168.1.12:8081",
         "http://192.168.1.12:3000",
         "http://192.168.1.12:8000",  # ← Add this for Django API
+        "http://192.168.1.5:8081",   # Expo on current IP
+        "http://192.168.1.5:3000",   # Web on current IP
+        "http://192.168.1.5:8000",   # Django API on current IP
     ]
+
+CORS_ALLOW_CREDENTIALS = True
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

@@ -13,8 +13,8 @@ class ProductItemSerializer(serializers.ModelSerializer):
             "unit_price",
             "category_name",
         ]
-        
-        
+
+
 class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductItemSerializer(source="product_item", read_only=True)
     total_price = serializers.SerializerMethodField()
@@ -27,7 +27,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
         if not obj.product_item:
             return 0
         return obj.product_item.unit_price * obj.quantity
-    
+
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
@@ -75,7 +75,7 @@ class CheckoutSerializer(serializers.Serializer):
             if not cart:
                 raise serializers.ValidationError("Cart not found")
         else:
-            cart = getattr(buyer, 'cart', None)
+            cart, created = Cart.objects.get_or_create(buyer=buyer)
 
         if not cart or not cart.items.exists():
             raise serializers.ValidationError("Cart is empty")
