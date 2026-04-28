@@ -28,11 +28,20 @@ export async function apiFetch<T>(
   const json = await res.json().catch(() => null);
 
   if (!res.ok) {
-    const message =
-      json?.detail ||
-      json?.message ||
-      json?.non_field_errors?.[0] ||
-      `Request failed with status ${res.status}`;
+    let message = json?.detail || json?.message || json?.non_field_errors?.[0];
+    
+    // Fallback: if it's a validation error object (e.g. {"product": ["You can only review..."]}), get the first array item
+    if (!message && json && typeof json === 'object') {
+      const firstErrorVal = Object.values(json).find(val => Array.isArray(val) && val.length > 0 && typeof val[0] === 'string');
+      if (firstErrorVal) {
+        message = (firstErrorVal as string[])[0];
+      }
+    }
+    
+    if (!message) {
+      message = `Request failed with status ${res.status}`;
+    }
+    
     throw new ApiError(res.status, message);
   }
 

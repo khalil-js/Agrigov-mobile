@@ -85,7 +85,6 @@ class MeView(APIView):
 
     def get(self, request):
         serializer = MeSerializer(request.user)
-
         return Response(
             {
                 "status": "success",
@@ -93,6 +92,23 @@ class MeView(APIView):
                 "data": serializer.data
             },
             status=status.HTTP_200_OK
+        )
+
+    def patch(self, request):
+        user = request.user
+        allowed_fields = ["username", "email", "phone"]
+        for field in allowed_fields:
+            if field in request.data:
+                setattr(user, field, request.data[field])
+        user.save(update_fields=[f for f in allowed_fields if f in request.data])
+        return Response(
+            {
+                "status": "success",
+                "code": status.HTTP_200_OK,
+                "message": "Profile updated successfully",
+                "data": UserSerializer(user).data,
+            },
+            status=status.HTTP_200_OK,
         )
 
 

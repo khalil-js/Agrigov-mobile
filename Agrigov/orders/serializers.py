@@ -34,6 +34,7 @@ class OrderSerializer(serializers.ModelSerializer):
     buyer = serializers.StringRelatedField()
     farm = serializers.StringRelatedField()
     allowed_statuses = serializers.SerializerMethodField()
+    invoice_pdf = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -45,8 +46,14 @@ class OrderSerializer(serializers.ModelSerializer):
             'status',
             'created_at',
             'items',
-            'allowed_statuses'
+            'allowed_statuses',
+            'invoice_pdf'
         ]
+
+    def get_invoice_pdf(self, obj):
+        if hasattr(obj, 'invoice') and obj.invoice:
+            return obj.invoice.pdf_url
+        return None
 
     def get_allowed_statuses(self, obj):
         request = self.context.get('request')
