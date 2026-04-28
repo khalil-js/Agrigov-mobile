@@ -9,6 +9,24 @@ export interface ApiVehicle {
   capacity: number;
 }
 
+export interface ApiTransporter {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  wilaya: string;
+  rating: number;
+  completed_missions: number;
+  is_verified: boolean;
+  vehicles?: ApiVehicle[];
+}
+
+export interface TransporterWithPricing extends ApiTransporter {
+  price_per_km: number;
+  base_price: number;
+  estimated_delivery_days: number;
+}
+
 export interface ApiMission {
   id: number;
   order: number;
@@ -46,6 +64,14 @@ export interface VehiclesListResponse {
 }
 
 export const transporterApi = {
+  // ─── Transporters ────────────────────────────────────────────────────────────────
+
+  // GET /api/transporters/available/ - Get available transporters for buyer
+  availableTransporters: (wilaya?: string) => {
+    const qs = wilaya ? `?wilaya=${encodeURIComponent(wilaya)}` : "";
+    return apiFetch<TransporterWithPricing[]>(`/api/transporters/available/${qs}`);
+  },
+
   // ─── Missions ────────────────────────────────────────────────────────────────
 
   // GET /api/missions/available/ - Transporter sees pending missions in their wilaya

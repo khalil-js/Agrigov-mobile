@@ -16,6 +16,8 @@ import { useNavigation } from "@react-navigation/native";
 import { useFocusEffect } from "@react-navigation/native";
 import { cartApi } from "../../apis/cart.api";
 import { orderApi } from "../../apis/order.api";
+import { transporterApi, ApiVehicle } from "../../apis/transporter.api";
+import { useAuth } from "../../context/AuthContext";
 
 const formatDZD = (value: number) =>
   new Intl.NumberFormat("fr-DZ").format(Math.round(value)) + " DZD";
@@ -29,32 +31,23 @@ interface Transporter {
   badge?: string;
 }
 
-const TRANSPORTERS: Transporter[] = [
-  {
-    id: 1,
-    name: "Agro Logistics",
-    rating: 4.8,
-    price: 120,
-    delivery_time: "2 Days",
-    badge: "Fastest",
-  },
-  {
-    id: 2,
-    name: "Farm Express",
-    rating: 4.5,
-    price: 90,
-    delivery_time: "4 Days",
-  },
-];
+interface TransporterWithMission extends ApiVehicle {
+  price_per_km: number;
+  rating: number;
+  completed_missions: number;
+  wilaya?: string;
+}
 
 export default function CheckoutScreen() {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [subtotal, setSubtotal] = useState(0);
-  const [selectedTransporter, setSelectedTransporter] = useState<Transporter>(
-    TRANSPORTERS[0],
-  );
+  const [transporters, setTransporters] = useState<Transporter[]>([]);
+  const [transporterLoading, setTransporterLoading] = useState(true);
+  const [selectedTransporter, setSelectedTransporter] = useState<Transporter | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [card, setCard] = useState({
     number: "",
     expiry: "",
@@ -63,6 +56,7 @@ export default function CheckoutScreen() {
   });
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
+  // Fetch cart items
   useFocusEffect(
     useCallback(() => {
       const fetchCart = async () => {
@@ -71,7 +65,7 @@ export default function CheckoutScreen() {
           setProducts(res.items || []);
           setSubtotal(parseFloat(res.total_price || 0));
         } catch (err) {
-          console.error(err);
+          console.error("Failed to fetch cart:", err);
         } finally {
           setLoading(false);
         }
@@ -80,18 +74,125 @@ export default function CheckoutScreen() {
     }, []),
   );
 
+  // Fetch available transporters
+  useFocusEffect(
+    useCallback(() => {
+      const fetchTransporters = async () => {
+        try {
+          setTransporterLoading(true);
+          // Fetch available transporters from backend
+          // TODO: Replace with actual API endpoint when backend supports it
+          // const transportersData = await transporterApi.availableTransporters(userProfile?.wilaya);
+
+          // For now, use mock transporters until backend endpoint is available
+          const mockTransporters: Transporter[] = [
+            {
+              id: 1,
+              name: "Agro Logistics",
+              rating: 4.8,
+              price: 120,
+              delivery_time: "2-3 Days",
+              badge: "Fastest",
+            },
+            {
+              id: 2,
+              name: "Farm Express",
+              rating: 4.5,
+              price: 90,
+              delivery_time: "3-4 Days",
+            },
+            {
+              id: 3,
+              name: "Djaz Transport",
+              rating: 4.7,
+              price: 100,
+              delivery_time: "2-4 Days",
+            },
+          ];
+
+          setTransporters(mockTransporters);
+          if (mockTransporters.length > 0) {
+            setSelectedTransporter(mockTransporters[0]);
+          }
+        } catch (err) {
+          console.error("Failed to fetch transporters:", err);
+        } finally {
+          setTransporterLoading(false);
+        }
+      };
+      fetchTransporters();
+    }, [userProfile?.wilaya]),
+  );
+
+  // Fetch user profile for delivery address
+  useFocusEffect(
+    useCallback(() => {
+      const fetchProfile = async () => {
+        try {
+          const { profileApi } = await import("../../apis/profile.api");
+          const profile = await profileApi.me();
+          setUserProfile(profile);
+        } catch (err) {
+          console.error("Failed to fetch profile:", err);
+        }
+      };
+      fetchProfile();
+    }, []),
+  );
+
   const levy = subtotal * 0.01;
-  const total = subtotal + selectedTransporter.price + levy;
+  const total = selectedTransporter ? subtotal + selectedTransporter.price + levy : subtotal + levy;
 
   const handleCheckout = async () => {
+    // Validate payment info
+    if (!card.number || !card.expiry || !card.cvc || !card.name) {
+      Alert.alert("Missing Payment Info", "Please fill in all card details");
+      return;
+    }
+
+    if (!selectedTransporter) {
+      Alert.alert("No Transporter", "Please select a transporter");
+      return;
+    }
+
     setCheckoutLoading(true);
     try {
-      await orderApi.checkout();
-      Alert.alert("Order Placed!", "Your order has been placed successfully.", [
-        { text: "View Orders", onPress: () => navigation.navigate("Orders") },
-      ]);
+      // Build checkout payload
+      const payload = {
+        transporter_id: selectedTransporter.id,
+        delivery_address: userProfile?.delivery_address || "Jijel, Algeria",
+        wilaya: userProfile?.wilaya || "Jijel",
+        baladiya: userProfile?.baladiya || "Jijel",
+        phone: userProfile?.phone || "+213 XXX XXX",
+        payment_method: "card",
+        card_number: card.number,
+        card_expiry: card.expiry,
+        card_cvc: card.cvc,
+        card_name: card.name,
+        notes: "",
+      };
+
+      const result = await orderApi.checkout(payload);
+
+      // Clear cart after successful order
+      await cartApi.clear().catch(() => {});
+
+      Alert.alert(
+        "Order Placed!",
+        `Your order ${result.order_number} has been placed successfully.`,
+        [
+          {
+            text: "View Orders",
+            onPress: () => navigation.navigate("Orders"),
+          },
+        ],
+      );
     } catch (err: any) {
-      Alert.alert("Checkout Failed", err.message || "An error occurred");
+      console.error("Checkout error:", err);
+      Alert.alert(
+        "Checkout Failed",
+        err.response?.data?.detail || err.message || "An error occurred",
+      );
     } finally {
       setCheckoutLoading(false);
     }
@@ -161,9 +262,17 @@ export default function CheckoutScreen() {
           </View>
 
           <View style={styles.addressBody}>
-            <Text style={styles.addressName}>Farm Warehouse</Text>
-            <Text style={styles.addressSub}>Jijel, Algeria</Text>
-            <Text style={styles.addressSub}>+213 XXX XXX</Text>
+            <Text style={styles.addressName}>
+              {userProfile?.full_name || userProfile?.username || "Delivery Address"}
+            </Text>
+            <Text style={styles.addressSub}>
+              {userProfile?.wilaya && userProfile?.baladiya
+                ? `${userProfile.wilaya}, ${userProfile.baladiya}`
+                : "Jijel, Algeria"}
+            </Text>
+            <Text style={styles.addressSub}>
+              {userProfile?.phone || "+213 XXX XXX"}
+            </Text>
           </View>
         </View>
 
@@ -176,59 +285,71 @@ export default function CheckoutScreen() {
             <Text style={styles.cardTitle}>Select Transporter</Text>
           </View>
 
-          {TRANSPORTERS.map((t) => (
-            <TouchableOpacity
-              key={t.id}
-              style={[
-                styles.transporterOpt,
-                selectedTransporter.id === t.id && styles.transporterOptActive,
-              ]}
-              onPress={() => setSelectedTransporter(t)}
-            >
-              <View style={styles.transporterLeft}>
-                <View style={styles.transporterAvatar}>
-                  <MaterialIcons
-                    name="directions-car"
-                    size={16}
-                    color="#047857"
-                  />
-                </View>
-                <View>
-                  <View style={styles.transporterNameRow}>
-                    <Text style={styles.transporterName}>{t.name}</Text>
-                    {t.badge && (
-                      <View style={styles.transporterBadge}>
-                        <Text style={styles.transporterBadgeText}>
-                          {t.badge}
-                        </Text>
-                      </View>
-                    )}
+          {transporterLoading ? (
+            <View style={styles.transporterLoading}>
+              <ActivityIndicator size="small" color="#047857" />
+              <Text style={styles.transporterLoadingText}>Finding transporters...</Text>
+            </View>
+          ) : transporters.length === 0 ? (
+            <View style={styles.emptyTransporters}>
+              <MaterialIcons name="local-shipping" size={32} color="#d1d5db" />
+              <Text style={styles.emptyTransportersText}>No transporters available</Text>
+            </View>
+          ) : (
+            transporters.map((t) => (
+              <TouchableOpacity
+                key={t.id}
+                style={[
+                  styles.transporterOpt,
+                  selectedTransporter?.id === t.id && styles.transporterOptActive,
+                ]}
+                onPress={() => setSelectedTransporter(t)}
+              >
+                <View style={styles.transporterLeft}>
+                  <View style={styles.transporterAvatar}>
+                    <MaterialIcons
+                      name="directions-car"
+                      size={16}
+                      color="#047857"
+                    />
                   </View>
-                  <View style={styles.transporterMeta}>
-                    <MaterialIcons name="star" size={11} color="#f59e0b" />
-                    <Text style={styles.transporterMetaText}>{t.rating}</Text>
-                    <Text style={styles.metaDot}>·</Text>
-                    <MaterialIcons name="schedule" size={11} color="#9ca3af" />
-                    <Text style={styles.transporterMetaText}>
-                      {t.delivery_time}
-                    </Text>
+                  <View>
+                    <View style={styles.transporterNameRow}>
+                      <Text style={styles.transporterName}>{t.name}</Text>
+                      {t.badge && (
+                        <View style={styles.transporterBadge}>
+                          <Text style={styles.transporterBadgeText}>
+                            {t.badge}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.transporterMeta}>
+                      <MaterialIcons name="star" size={11} color="#f59e0b" />
+                      <Text style={styles.transporterMetaText}>{t.rating}</Text>
+                      <Text style={styles.metaDot}>·</Text>
+                      <MaterialIcons name="schedule" size={11} color="#9ca3af" />
+                      <Text style={styles.transporterMetaText}>
+                        {t.delivery_time}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-              <View style={styles.transporterPriceCol}>
-                <Text style={styles.transporterPrice}>
-                  {formatDZD(t.price)}
-                </Text>
-                {selectedTransporter.id === t.id && (
-                  <MaterialIcons
-                    name="check-circle"
-                    size={16}
-                    color="#0df20d"
-                  />
-                )}
-              </View>
-            </TouchableOpacity>
-          ))}
+                <View style={styles.transporterPriceCol}>
+                  <Text style={styles.transporterPrice}>
+                    {formatDZD(t.price)}
+                  </Text>
+                  {selectedTransporter?.id === t.id && (
+                    <MaterialIcons
+                      name="check-circle"
+                      size={16}
+                      color="#0df20d"
+                    />
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
         </View>
 
         {/* Payment Method */}
@@ -314,8 +435,8 @@ export default function CheckoutScreen() {
 
           <Row label="Subtotal" value={formatDZD(subtotal)} />
           <Row
-            label={`Transport (${selectedTransporter.name})`}
-            value={formatDZD(selectedTransporter.price)}
+            label={`Transport (${selectedTransporter?.name || "N/A"})`}
+            value={formatDZD(selectedTransporter?.price || 0)}
           />
           <Row label="Platform levy (1%)" value={formatDZD(levy)} />
 
@@ -618,6 +739,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     color: "#047857",
+  },
+
+  transporterLoading: {
+    paddingVertical: 20,
+    alignItems: "center",
+    gap: 8,
+  },
+
+  transporterLoadingText: {
+    fontSize: 12,
+    color: "#9ca3af",
+    fontWeight: "600",
+  },
+
+  emptyTransporters: {
+    paddingVertical: 20,
+    alignItems: "center",
+    gap: 8,
+  },
+
+  emptyTransportersText: {
+    fontSize: 13,
+    color: "#9ca3af",
   },
 
   // ── PAYMENT INPUTS
