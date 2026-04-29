@@ -1,6 +1,8 @@
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from django.db.models import Q
+from django.utils import timezone
 
 from .models import OfficialPrice
 from .serializers import OfficialPriceSerializer
@@ -72,3 +74,16 @@ class OfficialPriceListView(generics.ListAPIView):
     queryset = OfficialPrice.objects.select_related("product").all()
     serializer_class = OfficialPriceSerializer
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+class ActivePricesListView(generics.ListAPIView):
+    """GET /official-prices/active/  — public endpoint to list all current active prices"""
+    serializer_class = OfficialPriceSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        now = timezone.now()
+        return OfficialPrice.objects.select_related("product").filter(
+            valid_from__lte=now
+        ).filter(
+            Q(valid_until__isnull=True) | Q(valid_until__gte=now)
+        ).order_by("product__name")

@@ -9,6 +9,7 @@ import InventoryScreen from "../screens/farmer/InventoryScreen";
 import AddProductScreen from "../screens/farmer/AddProductScreen";
 import EditProductScreen from "../screens/farmer/EditProductScreen";
 import LogisticsScreen from "../screens/farmer/LogisticsScreen";
+import OfficialPricesScreen from "../screens/farmer/OfficialPricesScreen";
 import ProfileStack from "./ProfileStack"; // Using the same profile screen
 
 // Define types
@@ -21,6 +22,7 @@ export type InventoryStackParamList = {
 export type FarmerTabParamList = {
   Dashboard: undefined;
   Inventory: undefined;
+  Prices: undefined;
   Logistics: undefined;
   Profile: undefined;
 };
@@ -51,6 +53,8 @@ export default function FarmerTabNavigator() {
             iconName = focused ? "home" : "home-outline";
           } else if (route.name === "Inventory") {
             iconName = focused ? "cube" : "cube-outline";
+          } else if (route.name === "Prices") {
+            iconName = focused ? "pricetags" : "pricetags-outline";
           } else if (route.name === "Logistics") {
             iconName = focused ? "car" : "car-outline";
           } else if (route.name === "Profile") {
@@ -68,6 +72,7 @@ export default function FarmerTabNavigator() {
     >
       <Tab.Screen name="Dashboard" component={FarmerDashboard} />
       <Tab.Screen name="Inventory" component={InventoryStackNavigator} />
+      <Tab.Screen name="Prices" component={OfficialPricesScreen} />
       <Tab.Screen name="Logistics" component={LogisticsScreen} />
       <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
